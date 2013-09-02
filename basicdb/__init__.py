@@ -1,4 +1,5 @@
 import falcon
+import importlib
 import re
 import time
 import urllib
@@ -7,7 +8,14 @@ import xml.etree.cElementTree as etree
 
 _domains = {}
 
+backend_driver = 'fake'
+
+backend =  importlib.import_module('basicdb.backends.%s' % (backend_driver,)).driver
+
 class Authentication(object):
+    pass
+
+class AllAttributes(object):
     pass
 
 class DomainResource(object):
@@ -20,29 +28,29 @@ class DomainResource(object):
         action = req.get_param("Action")
         if action == "CreateDomain":
             domain_name = req.get_param("DomainName")
-            _domains[domain_name] = {}
-            resp.status = falcon.HTTP_200  # This is the default status
 
+            backend.create_domain(domain_name)
+
+            resp.status = falcon.HTTP_200  # This is the default status
             dom = etree.Element("CreateDomainResponse")
         elif action == "DeleteDomain":
             domain_name = req.get_param("DomainName")
-            del _domains[domain_name]
-            resp.status = falcon.HTTP_200  # This is the default status
 
+            backend.delete_domain(domain_name)
+
+            resp.status = falcon.HTTP_200  # This is the default status
             dom = etree.Element("DeleteDomainResponse")
         elif action == "ListDomains":
             resp.status = falcon.HTTP_200
             dom = etree.Element("ListDomainsResponse")
 
             result = etree.SubElement(dom, "ListDomainsResult")
-            for name in _domains.keys():
+            for name in backend.list_domains():
                 domain_name = etree.SubElement(result, "DomainName")
                 domain_name.text = name
         elif action == "DeleteAttributes":
             domain_name = req.get_param("DomainName")
             item_name = req.get_param("ItemName")
-            if not item_name in _domains[domain_name]:
-                return
 
             attrs = {}
             r = re.compile(r'Attribute\.(\d+)\.(Name|Value)')
@@ -56,22 +64,28 @@ class DomainResource(object):
                     attrs[idx] = {}
                 attrs[idx][elem] = v
 
+            deletions = {}
             for idx, data in attrs.iteritems():
                 if 'Name' not in attrs[idx]:
-                    return
+                    continue
+
+                attr_name = attrs[idx]['Name']
+
+                if attr_name not in deletions:
+                    deletions[attr_name] = set()
 
                 if 'Value' in attrs[idx]:
-                    _domains[domain_name][item_name][attrs[idx]['Name']].remove(attrs[idx]['Value'])
+                    deletions[attr_name].add(attrs[idx]['Value'])
                 else:
-                    del _domains[domain_name][item_name][attrs[idx]['Name']]
+                    deletions[attr_name].add(AllAttributes)
+
+            backend.delete_attributes(domain_name, item_name, deletions)
 
             resp.status = falcon.HTTP_200
             dom = etree.Element("DeleteAttributesResponse")
         elif action == "PutAttributes":
             domain_name = req.get_param("DomainName")
             item_name = req.get_param("ItemName")
-            if not item_name in _domains[domain_name]:
-                _domains[domain_name][item_name] = {}
 
             attrs = {}
             r = re.compile(r'Attribute\.(\d+)\.(Name|Value|Replace)')
@@ -85,70 +99,47 @@ class DomainResource(object):
                     attrs[idx] = {}
                 attrs[idx][elem] = v
 
+            additions = {}
+            replacements = {}
             for idx, data in attrs.iteritems():
                 if 'Name' in attrs[idx] and 'Value' in attrs[idx]:
                     name = attrs[idx]['Name']
                     value = attrs[idx]['Value']
-                    if (name not in _domains[domain_name][item_name]) or ('Replace' in attrs[idx] and attrs[idx]['Replace'] == 'true'):
-                        _domains[domain_name][item_name][name] = []
-                    _domains[domain_name][item_name][name] += [value]
+                    if 'Replace' in attrs[idx] and attrs[idx]['Replace'] == 'true':
+                        if name not in replacements:
+                            replacements[name] = set()
+                        replacements[name].add(value)
+                    else:
+                        if name not in additions:
+                            additions[name] = set()
+                        additions[name].add(value)
+            backend.put_attributes(domain_name, item_name, additions, replacements)
 
             resp.status = falcon.HTTP_200
             dom = etree.Element("PutAttributesResponse")
         elif action == "Select":
-            import sqlparser
-            sql_stmt = urllib.unquote(req.get_param('SelectExpression'))
-            parsed = sqlparser.simpleSQL.parseString(sql_stmt)
-            domain_name = parsed.tables[0]
-            attrs = parsed.columns
-            matching_items = {}
-            filters = []
-            if parsed.where:
-                for clause in parsed.where[0][1:]:
-                    if len(clause) == 0:
-                        continue
-                    col_name, rel, rval = clause
-                    if rel == '=':
-                        filters += [lambda x:x[col_name] == rval]
-                    elif rel == 'like':
-                        regex = re.compile(rval.replace('_', '.').replace('%', '.*'))
-                        filters += [lambda x:any([regex.match(f) for f in x.get(col_name, [])])]
-
-            for item, item_attrs in _domains[domain_name].iteritems():
-                if all(f(item_attrs) for f in filters):
-                    matching_items[item] = item_attrs
+            sql_expr = urllib.unquote(req.get_param('SelectExpression'))
+            results = backend.select(sql_expr)
 
             resp.status = falcon.HTTP_200
             dom = etree.Element("SelectResponse")
             result = etree.SubElement(dom, "SelectResult")
 
-            for item, item_attrs in matching_items.iteritems():
-                requested_attributes = []
-                for name, l in item_attrs.iteritems():
-                    if (attrs == '*') or (name in attrs.asList()):
-                        requested_attributes += [(name, value) for value in l]
-
-                if not requested_attributes:
-                    continue
+            for item_name, item_attrs in results.iteritems():
                 item_elem = etree.SubElement(result, "Item")
-                etree.SubElement(item_elem, "Name").text = item
-                for name, value in requested_attributes:
-                    attr_elem = etree.SubElement(item_elem, "Attribute")
-                    etree.SubElement(attr_elem, "Name").text = name
-                    etree.SubElement(attr_elem, "Value").text = value
+                etree.SubElement(item_elem, "Name").text = item_name
+                for attr_name, attr_values in item_attrs.iteritems():
+                    for attr_value in attr_values:
+                        attr_elem = etree.SubElement(item_elem, "Attribute")
+                        etree.SubElement(attr_elem, "Name").text = attr_name
+                        etree.SubElement(attr_elem, "Value").text = attr_value
         elif action == "DomainMetadata":
             domain_name = req.get_param("DomainName")
             resp.status = falcon.HTTP_200
             dom = etree.Element("DomainMetadataResponse")
             result = etree.SubElement(dom, "DomainMetadataResult")
-            etree.SubElement(result, "ItemCount").text = str(len(_domains[domain_name]))
-            etree.SubElement(result, "ItemNamesSizeBytes").text = str(sum((len(s) for s in _domains[domain_name].keys())))
-            etree.SubElement(result, "AttributeNameCount").text = '12'
-            etree.SubElement(result, "AttributeNamesSizeBytes").text = '120'
-            etree.SubElement(result, "AttributeValueCount").text = '120'
-            etree.SubElement(result, "AttributeValuesSizeBytes").text = '100020'
-            etree.SubElement(result, "Timestamp").text = str(int(time.time()))
-
+            for k, v in backend.domain_metadata(domain_name).iteritems():
+                etree.SubElement(result, k).text = str(v)
         elif action == "GetAttributes":
             domain_name = req.get_param("DomainName")
             item_name = req.get_param("ItemName")
@@ -156,11 +147,11 @@ class DomainResource(object):
             dom = etree.Element("GetAttributesResponse")
             result = etree.SubElement(dom, "GetAttributesResult")
 
-            for k, v in _domains[domain_name][item_name].iteritems():
-                for x in v:
+            for attr_name, attr_values in backend.get_attributes(domain_name, item_name).iteritems():
+                for attr_value in attr_values:
                     attr_elem = etree.SubElement(result, "Attribute")
-                    etree.SubElement(attr_elem, "Name").text = k
-                    etree.SubElement(attr_elem, "Value").text = x
+                    etree.SubElement(attr_elem, "Name").text = attr_name
+                    etree.SubElement(attr_elem, "Value").text = attr_value
         else:
             print "Unknown action: %s" % (action,)
 

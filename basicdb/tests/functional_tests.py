@@ -25,7 +25,7 @@ def run_server(port, server_ready, done):
 
     fp = open('/tmp/null', 'a+')
     os.dup2(fp.fileno(), 0)
-#    os.dup2(fp.fileno(), 1)
+    os.dup2(fp.fileno(), 1)
     os.dup2(fp.fileno(), 2)
 
     from wsgiref.simple_server import make_server
@@ -35,24 +35,40 @@ def run_server(port, server_ready, done):
     server_ready.set()
     s.serve_forever()
 
-class BotoTests(unittest2.TestCase):
+class FunctionalTests(unittest2.TestCase):
     def setUp(self):
-        self.server_ready = Event()
-        self.done = Event()
-        self.server = Process(target=run_server, args=(8000, self.server_ready, self.done))
-        self.server.start()
-        self.port = 8000
+        existing_server = os.environ.get('BASICDB_PORT', False)
+        if not existing_server:
+            def kill_server():
+                os.kill(self.server.pid, signal.SIGINT)
+                self.server.join()
+            self.server_ready = Event()
+            self.done = Event()
+            self.server = Process(target=run_server, args=(8000, self.server_ready, self.done))
+            self.server.start()
+            self.port = 8000
 
-        self.server_ready.wait()
+            self.server_ready.wait()
+        else:
+            def kill_server():
+                pass
+
+            self.port = int(existing_server)
+
+        self.kill_server = kill_server
+
+    def tearDown(self):
+        self.kill_server()
+
+class BotoTests(FunctionalTests):
+    def setUp(self):
+        super(BotoTests, self).setUp()
+
         local_region = boto.regioninfo.RegionInfo(name='local',
                                                   endpoint='localhost')
         self.conn = boto.connect_sdb('', '',
                                      region=local_region,
                                      is_secure=False, port=self.port)
-
-    def tearDown(self):
-        os.kill(self.server.pid, signal.SIGINT)
-        self.server.join()
 
     def test_create_list_delete_domains(self):
         self.conn.create_domain('test-domain')
@@ -108,19 +124,11 @@ class BotoTests(unittest2.TestCase):
         self.conn.delete_domain('test-domain')
 
 
-class BasicTests(unittest2.TestCase):
+class BasicTests(FunctionalTests):
     def setUp(self):
-        self.http = httplib2.Http()
-        self.server_ready = Event()
-        self.done = Event()
-        self.server = Process(target=run_server, args=(8000, self.server_ready, self.done))
-        self.server.start()
-        self.port = 8000
-        self.server_ready.wait()
+        super(BasicTests, self).setUp()
 
-    def tearDown(self):
-        os.kill(self.server.pid, signal.SIGINT)
-        self.server.join()
+        self.http = httplib2.Http()
 
     def list_domains(self):
         resp, content = self.http.request("http://localhost:8000/?Action=ListDomains&AWSAccessKeyId=valid_access_key_id&MaxNumberOfDomains=2&NextToken=valid_next_token&SignatureVersion=2&SignatureMethod=HmacSHA256&Timestamp=2010-01-25T15%3A02%3A19-07%3A00&Version=2009-04-15&Signature=valid_signature", "GET")
