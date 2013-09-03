@@ -1,13 +1,10 @@
 import boto
 import boto.exception
 import boto.regioninfo
-import httplib2
 import os
 from multiprocessing import Process, Event
 import signal
 import unittest2
-import urllib
-import xml.dom.minidom
 
 import basicdb
 
@@ -115,6 +112,21 @@ class BotoTests(FunctionalTests):
 
         self.conn.delete_domain('test-domain')
 
+    def test_delete_attrs(self):
+        self.conn.create_domain('test-domain')
+        dom = self.conn.get_domain('test-domain')
+
+        item_name = 'ABC_123'
+        item_attrs = {'Artist': 'The Jackson 5', 'Genera':'Pop'}
+        retval = dom.put_attributes(item_name, item_attrs)
+        self.assertEquals(retval, True)
+        dom.delete_attributes(item_name, ['Artist'])
+
+        self.assertEquals(dom.get_attributes(item_name),
+                          {'Genera': 'Pop'})
+
+        self.conn.delete_domain('test-domain')
+
     def test_add_item_conditionally(self):
         self.conn.create_domain('test-domain')
         dom = self.conn.get_domain('test-domain')
@@ -163,150 +175,6 @@ class BotoTests(FunctionalTests):
 
         self.conn.delete_domain('test-domain')
 
-
-class BasicTests(FunctionalTests):
-    def setUp(self):
-        super(BasicTests, self).setUp()
-
-        self.http = httplib2.Http()
-
-    def list_domains(self):
-        resp, content = self.http.request("http://localhost:8000/?Action=ListDomains&AWSAccessKeyId=valid_access_key_id&MaxNumberOfDomains=2&NextToken=valid_next_token&SignatureVersion=2&SignatureMethod=HmacSHA256&Timestamp=2010-01-25T15%3A02%3A19-07%3A00&Version=2009-04-15&Signature=valid_signature", "GET")
-        self.assertEquals(resp.status, 200)
-        dom = xml.dom.minidom.parseString(content)
-        domains_result = dom.getElementsByTagName('ListDomainsResult')[0]
-        return [x.childNodes[0].data for x in domains_result.getElementsByTagName('DomainName')]
-
-    def create_domain(self, domain_name):
-        resp, content = self.http.request("http://localhost:8000/?Action=CreateDomain&AWSAccessKeyId=valid_access_key_id&DomainName=%s&SignatureVersion=2&SignatureMethod=HmacSHA256&Timestamp=2010-01-25T15%%3A01%%3A28-07%%3A00&Version=2009-04-15&Signature=valid_signature" % (domain_name,), "GET")
-        self.assertEquals(resp.status, 200)
-        xml.dom.minidom.parseString(content)
-
-    def delete_domain(self, domain_name):
-        resp, content = self.http.request("http://localhost:8000/?Action=DeleteDomain&AWSAccessKeyId=valid_access_key_id&DomainName=%s&SignatureVersion=2&SignatureMethod=HmacSHA256&Timestamp=2010-01-25T15%%3A02%%3A20-07%%3A00&Version=2009-04-15&Signature=valid_signature" % (domain_name,), "GET")
-        self.assertEquals(resp.status, 200)
-        xml.dom.minidom.parseString(content)
-
-    def test_list_domains_empty(self):
-        self.assertEquals(self.list_domains(), [])
-
-    def test_create_delete_domain(self):
-        self.create_domain('MyDomain')
-        self.assertEquals(self.list_domains(), ['MyDomain'])
-        self.create_domain('MyDomain2')
-        self.assertEquals(set(self.list_domains()), set(['MyDomain', 'MyDomain2']))
-        self.delete_domain('MyDomain')
-        self.delete_domain('MyDomain2')
-        self.assertEquals(self.list_domains(), [])
-
-    def test_put_attributes(self):
-        self.create_domain('MyDomain')
-        self.put_attributes('MyDomain', 'MyItem', {'colour': 'red'}, ['colour'])
-
-    def test_put_get_attributes(self):
-        self.create_domain('MyDomain')
-        self.put_attributes('MyDomain', 'MyItem', {'colour': 'red'}, ['colour'])
-        attrs = self.get_attributes('MyDomain', 'MyItem')
-        self.assertEquals(attrs, {'colour': set(['red'])})
-
-        self.put_attributes('MyDomain', 'MyItem', {'colour': 'blue'}, ['colour'])
-        attrs = self.get_attributes('MyDomain', 'MyItem')
-        self.assertEquals(attrs, {'colour': set(['blue'])})
-
-        self.put_attributes('MyDomain', 'MyItem', {'colour': 'red'})
-        attrs = self.get_attributes('MyDomain', 'MyItem')
-        self.assertEquals(attrs, {'colour': set(['blue', 'red'])})
-        self.delete_domain('MyDomain')
-
-    def test_delete_attributes(self):
-        self.create_domain('MyDomain')
-        try:
-            self.put_attributes('MyDomain', 'MyItem', {'colour': 'red'})
-            self.put_attributes('MyDomain', 'MyItem', {'shape': 'square'} )
-
-            attrs = self.get_attributes('MyDomain', 'MyItem')
-            self.assertEquals(attrs, {'colour': set(['red']), 'shape': set(['square'])})
-
-            self.delete_attributes('MyDomain', 'MyItem', {'colour': None})
-            attrs = self.get_attributes('MyDomain', 'MyItem')
-            self.assertEquals(attrs, {'shape': set(['square'])})
-        finally:
-            self.delete_domain('MyDomain')
-
-    def test_select(self):
-        self.create_domain('MyDomain')
-        try:
-            self.put_attributes('MyDomain', 'MyItem1', {'colour': 'red'})
-            self.put_attributes('MyDomain', 'MyItem2', {'colour': 'Blue'})
-            self.put_attributes('MyDomain', 'MyItem3', {'shape': 'Blue'})
-            self.put_attributes('MyDomain', 'MyItem4', {'shape': 'triangle'})
-            self.put_attributes('MyDomain', 'MyItem4', {'shape': 'square'})
-
-            res = self.select('select colour from MyDomain where colour like "Blue"')
-            self.assertEquals(res, {'MyItem2': {'colour': set(['Blue'])}})
-            res = self.select('select blah from MyDomain where colour like "Blue"')
-            self.assertEquals(res, {})
-            res = self.select('select shape from MyDomain where shape like "square"')
-            self.assertEquals(res, {'MyItem4': {'shape': set(['triangle', 'square'])}})
-        finally:
-            self.delete_domain('MyDomain')
-
-    def select(self, sql):
-        resp, content = self.http.request("http://localhost:8000/?Action=Select&AWSAccessKeyId=valid_access_key_id&NextToken=valid_next_token&SelectExpression=%s&ConsistentRead=true&SignatureVersion=2&SignatureMethod=HmacSHA256&Timestamp=2010-01-25T15%%3A03%%3A09-07%%3A00&Version=2009-04-15&Signature=valid_signature" % (urllib.quote(sql),), "GET")
-        self.assertEquals(resp.status, 200)
-        dom = xml.dom.minidom.parseString(content)
-        select_result = dom.getElementsByTagName('SelectResult')[0]
-        res = {}
-        for item in select_result.getElementsByTagName('Item'):
-            name = item.getElementsByTagName('Name')[0].childNodes[0].data
-            attrs = {}
-            for attr in item.getElementsByTagName('Attribute'):
-                attr_name = attr.getElementsByTagName('Name')[0].childNodes[0].data
-                attr_value = attr.getElementsByTagName('Value')[0].childNodes[0].data
-                if attr_name not in attrs:
-                    attrs[attr_name] = set()
-                attrs[attr_name].add(attr_value)
-            res[name] = attrs
-        return res
-
-    def delete_attributes(self, domain_name, item_name, attrs):
-        s = ''
-        i = 1
-        for k, v in attrs.iteritems():
-            s += '&Attribute.%d.Name=%s' % (i, k,)
-            if v:
-                s += '&Attribute.%d.Value=%s' % (i, v,)
-            i += 1
-        resp, content = self.http.request("http://localhost:8000/?Action=DeleteAttributes%s&AWSAccessKeyId=valid_access_key_id&DomainName=%s&ItemName=%s&SignatureVersion=2&SignatureMethod=HmacSHA256&Timestamp=2010-01-25T15%%3A03%%3A05-07%%3A00&Version=2009-04-15&Signature=valid_signature" % (s, domain_name, item_name), "GET")
-        self.assertEquals(resp.status, 200)
-        xml.dom.minidom.parseString(content)
-
-    def get_attributes(self, domain_name, item_name):
-        resp, content = self.http.request("http://localhost:8000/?Action=GetAttributes&AWSAccessKeyId=valid_access_key:id&DomainName=%s&ItemName=%s&ConsistentRead=true&SignatureVersion=2&SignatureMethod=HmacSHA256&Timestamp=2010-01-25T15%%3A03%%3A07-07%%3A00&Version=2009-04-15&Signature=valid_signature" % (domain_name, item_name), "GET")
-        self.assertEquals(resp.status, 200)
-        attrs = {}
-        dom = xml.dom.minidom.parseString(content)
-        res = dom.getElementsByTagName('GetAttributesResult')[0]
-        for attr in res.getElementsByTagName('Attribute'):
-            name = attr.getElementsByTagName('Name')[0].childNodes[0].data
-            value = attr.getElementsByTagName('Value')[0].childNodes[0].data
-            if not name in attrs:
-                attrs[name] = set()
-            attrs[name].add(value)
-        return attrs
-
-    def put_attributes(self, domain_name, item_name, attrs, replacements=None):
-        s = ''
-        i = 1
-        for k, v in attrs.iteritems():
-            s += '&Attribute.%d.Name=%s' % (i, k,)
-            s += '&Attribute.%d.Value=%s' % (i, v,)
-            if replacements and k in replacements:
-                s += '&Attribute.%d.Replace=true' % (i,)
-            i += 1
-        resp, content = self.http.request("http://localhost:8000/?Action=PutAttributes%s&AWSAccessKeyId=valid_access_key_id&DomainName=%s&ItemName=%s&SignatureVersion=2&SignatureMethod=HmacSHA256&Timestamp=2010-01-25T15%%3A03%%3A05-07%%3A00&Version=2009-04-15&Signature=valid_signature" % (s, domain_name, item_name), "GET")
-        self.assertEquals(resp.status, 200)
-        xml.dom.minidom.parseString(content)
 
 if __name__ == "__main__":
     unittest2.main()
