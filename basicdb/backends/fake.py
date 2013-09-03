@@ -97,5 +97,23 @@ class FakeBackend(basicdb.backends.StorageBackend):
                 "AttributeValuesSizeBytes": '100020',
                 "Timestamp": str(int(time.time()))}
 
+    def check_expectation(self, domain_name, item_name, expectation):
+        if (domain_name not in self._domains or
+            item_name not in self._domains[domain_name]):
+            return False
+
+        attr_name, attr_value_expected = expectation
+
+        attr_value = self._domains[domain_name][item_name].get(attr_name, False)
+
+        if attr_value == False:
+            if attr_value_expected == False:
+                return True
+            return False
+        elif attr_value_expected == True:
+            return True
+        else:
+            return attr_value_expected in attr_value
+         
 
 driver = FakeBackend()

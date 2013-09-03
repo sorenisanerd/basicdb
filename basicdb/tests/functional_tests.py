@@ -1,4 +1,5 @@
 import boto
+import boto.exception
 import boto.regioninfo
 import httplib2
 import os
@@ -111,6 +112,45 @@ class BotoTests(FunctionalTests):
         self.assertEquals(retval, True)
         domain_meta = self.conn.domain_metadata(dom)
         self.assertEquals(domain_meta.item_count, 1)
+
+        self.conn.delete_domain('test-domain')
+
+    def test_add_item_conditionally(self):
+        self.conn.create_domain('test-domain')
+        dom = self.conn.get_domain('test-domain')
+
+        item_name = 'test-item'
+        item_attrs = {'attr1': 'attr1val1', 'attr2': 'attr2val1'}
+        retval = dom.put_attributes(item_name, item_attrs)
+        self.assertEquals(retval, True)
+
+        self.assertEquals(dom.get_attributes('test-item'),
+                          {'attr1': 'attr1val1', 'attr2': 'attr2val1'})
+
+        item_attrs = {'attr1': 'attr1val2'}
+
+        self.assertRaises(boto.exception.BotoServerError,
+                          dom.put_attributes, item_name, item_attrs,
+                          replace=False, expected_value=('attr1', 'attr1val2'))
+
+        self.assertEquals(dom.get_attributes('test-item'),
+                          {'attr1': 'attr1val1', 'attr2': 'attr2val1'},
+                          "Updated value even thought expectations were not met")
+
+        self.assertRaises(boto.exception.BotoServerError,
+                          dom.put_attributes, item_name, item_attrs,
+                          replace=False, expected_value=('attr1', False))
+
+        self.assertEquals(dom.get_attributes('test-item'),
+                          {'attr1': 'attr1val1', 'attr2': 'attr2val1'},
+                          "Updated value even thought expectations were not met")
+
+        retval = dom.put_attributes(item_name, item_attrs,
+                                    replace=False, expected_value=('attr1', True))
+
+        self.assertEquals(dom.get_attributes('test-item'),
+                          {'attr1': ['attr1val1', 'attr1val2'], 'attr2': 'attr2val1'},
+                          "Did not update value even thought expectations were met")
 
         self.conn.delete_domain('test-domain')
 

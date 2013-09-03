@@ -31,21 +31,49 @@ class BaseStorageBackendTests(unittest2.TestCase):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.delete_attribute_value, "domain", "item", "attrname", "attrvalue")
         
-    def test_put_attributes(self):
+    def test_put_attributes_raises_exception_if_expectations_are_not_met(self):
+        self.check_expectations_call_args = []
         self.add_attributes_call_args = []
         self.replace_attributes_call_args = []
 
         class TestStoreBackend(basicdb.backends.StorageBackend):
+            def check_expectations(self2, *args):
+                False
+                
+        backend = TestStoreBackend()
+        self.assertRaises(basicdb.exceptions.ConditionalCheckFailed,
+                          backend.put_attributes, "domain", "item",
+                          {"attr1": set(["attr1val1", "attr1val2"])},
+                          {"attr2": set(["attr2val1"])},
+                          [("attr3", True)])
+
+    def test_put_attributes(self):
+        self.check_expectations_call_args = []
+        self.add_attributes_call_args = []
+        self.replace_attributes_call_args = []
+
+        class TestStoreBackend(basicdb.backends.StorageBackend):
+            def check_expectations(self2, *args):
+                self.check_expectations_call_args += [args]
+                return True
+
             def add_attributes(self2, *args):
+                self.assertTrue(self.check_expectations_call_args,
+                                "check_expectations was not called before adding attributes")
                 self.add_attributes_call_args += [args]
 
             def replace_attributes(self2, *args):
+                self.assertTrue(self.check_expectations_call_args,
+                                "check_expectations was not called before replacing attributes")
                 self.replace_attributes_call_args += [args]
                 
         backend = TestStoreBackend()
         backend.put_attributes("domain", "item",
                                {"attr1": set(["attr1val1", "attr1val2"])},
-                               {"attr2": set(["attr2val1"])})
+                               {"attr2": set(["attr2val1"])},
+                               [("attr3", True)])
+        self.assertIn(("domain", "item", [("attr3", True)]), 
+                      self.check_expectations_call_args)
         self.assertIn(("domain", "item", {"attr1": set(["attr1val1", "attr1val2"])}),
                       self.add_attributes_call_args)
         self.assertIn(("domain", "item", {"attr2": set(["attr2val1"])}),
@@ -168,6 +196,24 @@ class BaseStorageBackendTests(unittest2.TestCase):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.select, "SELECT somethign FROM somewhere")
         
+    def test_check_expectation_raises_not_implemented(self):
+        backend = basicdb.backends.StorageBackend()
+        self.assertRaises(NotImplementedError,
+                          backend.check_expectation, 'domain', 'item', ('foo', 'bar'))
+
+    def test_check_expectations(self):
+        self.check_expectation_call_args = []
+        class TestStoreBackend(basicdb.backends.StorageBackend):
+            def check_expectation(self2, *args):
+                self.check_expectation_call_args += [args]
+                
+        backend = TestStoreBackend()
+        backend.check_expectations("domain", "item", [("attr1", "val1"), ("attr1", "val2"), ("attr2", "val3")])
+        self.assertIn(("domain", "item", ("attr1", "val1")), self.check_expectation_call_args)
+        self.assertIn(("domain", "item", ("attr1", "val2")), self.check_expectation_call_args)
+        self.assertIn(("domain", "item", ("attr2", "val3")), self.check_expectation_call_args)
+
+        
 class _GenericBackendDriverTest(unittest2.TestCase):
     def test_create_list_delete_domain(self):
         self.assertEquals(self.backend.list_domains(), [])
@@ -260,6 +306,32 @@ class _GenericBackendDriverTest(unittest2.TestCase):
                           {"item1": {"shape": set(["square", "triangle"])}})
 
 
+    def test_expectations_met(self):
+        self.backend.create_domain("domain1")
+        self.backend.put_attributes("domain1", "item1",
+                                    {"shape": set(["square", "triangle"])}, {})
+        
+        self.assertFalse(self.backend.check_expectations("domain1", "item1", [("shape", False)]))
+        self.assertFalse(self.backend.check_expectations("domain1", "item1", [("colour", True)]))
+        self.assertTrue(self.backend.check_expectations("domain1", "item1", [("colour", False)]))
+        self.assertTrue(self.backend.check_expectations("domain1", "item1", [("shape", True)]))
+        self.assertTrue(self.backend.check_expectations("domain1", "item1", [("shape", "square")]))
+
+        self.assertFalse(self.backend.check_expectations("domain1", "item1",
+                                                         [("shape", False),
+                                                          ("colour", False),
+                                                          ("shape", True),
+                                                          ("shape", "square")]))
+
+        self.assertTrue(self.backend.check_expectations("domain1", "item1",
+                                                        [("colour", False),
+                                                         ("shape", True),
+                                                         ("shape", "square")]))
+
+    def test_check_condition_fails_for_unknown_domain_and_item(self):
+        self.assertFalse(self.backend.check_expectations("domain1", "item1", [("foo", "bar")]))
+        self.backend.create_domain("domain1")
+        self.assertFalse(self.backend.check_expectations("domain1", "item1", [("foo", "bar")]))
 
 class FakeBackendDriverTest(_GenericBackendDriverTest):
     def setUp(self):

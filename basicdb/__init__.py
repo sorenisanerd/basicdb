@@ -6,7 +6,7 @@ import urllib
 import uuid
 import xml.etree.cElementTree as etree
 
-_domains = {}
+import basicdb.exceptions
 
 backend_driver = 'fake'
 
@@ -113,10 +113,40 @@ class DomainResource(object):
                         if name not in additions:
                             additions[name] = set()
                         additions[name].add(value)
-            backend.put_attributes(domain_name, item_name, additions, replacements)
 
-            resp.status = falcon.HTTP_200
-            dom = etree.Element("PutAttributesResponse")
+            expectation_params = {}
+            r = re.compile(r'Expected\.(\d+)\.(Name|Value|Exists)')
+            for (k, v) in req._params.iteritems():
+                match = r.match(k)
+                if not match:
+                    continue
+
+                idx, elem = match.groups()
+                if idx not in expectation_params:
+                    expectation_params[idx] = {}
+                expectation_params[idx][elem] = v
+
+            expectations = []
+            for idx, data in expectation_params.iteritems():
+                if 'Name' in expectation_params[idx]:
+                    if  'Value' in expectation_params[idx]:
+                        expected_value = expectation_params[idx]['Value']
+                    elif  'Exists' in expectation_params[idx]:
+                        val = expectation_params[idx]['Exists']
+                        expected_value = not (val == 'false')
+                    expectations += [(expectation_params[idx]['Name'],
+                                     expected_value)]
+
+
+            try:
+                backend.put_attributes(domain_name, item_name, additions, replacements,
+                                       expectations)
+                resp.status = falcon.HTTP_200
+                dom = etree.Element("PutAttributesResponse")
+            except basicdb.exceptions.APIException, e:
+                resp.status = e.http_status
+                dom = etree.Element(e.root_element)
+
         elif action == "Select":
             sql_expr = urllib.unquote(req.get_param('SelectExpression'))
             results = backend.select(sql_expr)

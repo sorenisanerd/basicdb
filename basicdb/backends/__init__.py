@@ -1,4 +1,5 @@
 import basicdb
+import basicdb.exceptions
 
 class StorageBackend(object):
     def create_domain(self, domain_name):
@@ -13,7 +14,8 @@ class StorageBackend(object):
         """List domains"""
         raise NotImplementedError()
 
-    def put_attributes(self, domain_name, item_name, additions, replacements):
+    def put_attributes(self, domain_name, item_name, additions, replacements,
+                       expectations=None):
         """Update the set of attributes on the given item:
         
         replacements is a dict where keys are attribute names and the
@@ -22,9 +24,14 @@ class StorageBackend(object):
         additions is a dict where keys are attribute names and the
         corresponding value is a set of values that are to be added to
         the given attribute.
+        expectations is an iterable of 2-tuples (attr_name, expected_value).
+        If expected_value is a boolean, it denotes whether the value is expected
+        to exist.
         
         If the backend does not have a quick mechanism for this, just leave
         this method alone and implement some of the more low-level methods"""
+        if expectations and not self.check_expectations(domain_name, item_name, expectations):
+            raise basicdb.exceptions.ConditionalCheckFailed()
         self.add_attributes(domain_name, item_name, additions)
         self.replace_attributes(domain_name, item_name, replacements)
 
@@ -91,3 +98,8 @@ class StorageBackend(object):
     def domain_metadata(self, domain_name):
         raise NotImplementedError()
 
+    def check_expectations(self, domain_name, item_name, expectations):
+        return all([self.check_expectation(domain_name, item_name, expectation) for expectation in expectations])
+        
+    def check_expectation(self, domain_name, item_name, expectations):
+        raise NotImplementedError()
