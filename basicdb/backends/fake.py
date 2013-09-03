@@ -31,8 +31,16 @@ class FakeBackend(basicdb.backends.StorageBackend):
             del self._domains[domain_name][item_name][attr_name]
 
     def delete_attribute_value(self, domain_name, item_name, attr_name, attr_value):
-        self._domains[domain_name][item_name][attr_name].remove(attr_value)
-    
+        if (domain_name in self._domains and
+            item_name in self._domains[domain_name] and
+            attr_name in self._domains[domain_name][item_name]):
+            try:
+                self._domains[domain_name][item_name][attr_name].remove(attr_value)
+            except KeyError:
+                pass
+            if not self._domains[domain_name][item_name][attr_name]:
+                del self._domains[domain_name][item_name][attr_name]
+
     def add_attribute_value(self, domain_name, item_name, attr_name, attr_value):
         if not item_name in self._domains[domain_name]:
             self._domains[domain_name][item_name] = {}
@@ -41,13 +49,13 @@ class FakeBackend(basicdb.backends.StorageBackend):
             self._domains[domain_name][item_name][attr_name] = set()
 
         self._domains[domain_name][item_name][attr_name].add(attr_value)
-        
+
     def get_attributes(self, domain_name, item_name):
         return self._domains[domain_name][item_name]
 
     def _get_all_items(self, domain_name):
         return self._domains[domain_name]
-        
+
     def select(self, sql_expr):
         parsed = sqlparser.simpleSQL.parseString(sql_expr)
         domain_name = parsed.tables[0] # Only one table supported
@@ -56,11 +64,9 @@ class FakeBackend(basicdb.backends.StorageBackend):
         filters = []
         if parsed.where:
             for clause in parsed.where[0][1:]:
-                if len(clause) == 0:
-                    continue
                 col_name, rel, rval = clause
                 if rel == '=':
-                    filters += [lambda x:x[col_name] == rval]
+                    filters += [lambda x:any([f == rval for f in x.get(col_name, [])])]
                 elif rel == 'like':
                     regex = re.compile(rval.replace('_', '.').replace('%', '.*'))
                     filters += [lambda x:any([regex.match(f) for f in x.get(col_name, [])])]

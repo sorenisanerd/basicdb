@@ -188,6 +188,79 @@ class _GenericBackendDriverTest(unittest2.TestCase):
         self.backend.create_domain("domain1")
         self.backend.domain_metadata("domain1")
 
+    def test_put_get_attributes(self):
+        self.backend.create_domain("domain1")
+        self.backend.put_attributes("domain1", "item1",
+                                    {"a": set(["b", "c"])},
+                                    {"d": set(["e"])})
+
+        self.assertEquals(self.backend.get_attributes("domain1", "item1"),
+                          {"a": set(["b", "c"]), "d": set(["e"])})
+
+        self.backend.put_attributes("domain1", "item1",
+                                    {"d": set(["f", "g"])},
+                                    {"a": set(["h"])})
+
+        self.assertEquals(self.backend.get_attributes("domain1", "item1"),
+                          {"a": set(["h"]), "d": set(["e", "f", "g"])})
+
+    def test_delete_attributes_non_existant_item(self):
+        self.backend.create_domain("domain1")
+        self.backend.delete_attributes("domain1", "item1",
+                                       {"a": set(["b"]),
+                                        "b": set([basicdb.AllAttributes])})
+
+    def test_delete_attributes_non_existant_domain(self):
+        self.backend.delete_attributes("domain1", "item1",
+                                       {"a": set(["b"]),
+                                        "b": set([basicdb.AllAttributes])})
+
+    def test_delete_attributes(self):
+        self.backend.create_domain("domain1")
+        self.backend.put_attributes("domain1", "item1",
+                                    {"a": set(["b", "c"]),
+                                     "d": set(["e"]),
+                                     "f": set(["g"])},
+                                     {})
+
+        self.backend.delete_attributes("domain1", "item1",
+                                       {"a": set([basicdb.AllAttributes]),
+                                        "d": set(["f"]),
+                                        "f": set(["g"])})
+
+        self.assertEquals(self.backend.get_attributes("domain1", "item1"),
+                          {"d": set(["e"])})
+
+    def test_select(self):
+        self.backend.create_domain("domain1")
+        self.backend.put_attributes("domain1", "item1",
+                                    {"shape": set(["square", "triangle"]),
+                                     "colour": set(["Blue"])}, {})
+        self.backend.put_attributes("domain1", "item2",
+                                    {"colour": set(["Blue"])}, {})
+        self.backend.put_attributes("domain1", "item3",
+                                    {"shape": set(["round"]),
+                                     "colour": set(["Red"])}, {})
+
+        self.assertEquals(self.backend.select("SELECT * FROM domain1"),
+                          {"item1": {"shape": set(["square", "triangle"]),
+                                     "colour": set(["Blue"])},
+                           "item2": {"colour": set(["Blue"])},
+                           "item3": {"shape": set(["round"]),
+                                     "colour": set(["Red"])}})
+
+        self.assertEquals(self.backend.select("SELECT shape FROM domain1"),
+                          {"item1": {"shape": set(["square", "triangle"])},
+                           "item3": {"shape": set(["round"])}})
+
+        self.assertEquals(self.backend.select("SELECT shape FROM domain1 WHERE colour LIKE 'Blue'"),
+                          {"item1": {"shape": set(["square", "triangle"])}})
+
+        self.assertEquals(self.backend.select("SELECT shape FROM domain1 WHERE shape = 'triangle'"),
+                          {"item1": {"shape": set(["square", "triangle"])}})
+
+
+
 class FakeBackendDriverTest(_GenericBackendDriverTest):
     def setUp(self):
         import basicdb.backends.fake
