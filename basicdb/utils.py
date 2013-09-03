@@ -40,14 +40,14 @@ def extract_expectations_from_query_params(req):
     args = extract_numbered_args(EXPECTED_QUERY_ARG_REGEX, req)
 
     expectations = set()
-    for idx, data in args.iteritems():
-        if 'Name' in args[idx]:
-            if  'Value' in args[idx]:
-                expected_value = args[idx]['Value']
-            elif  'Exists' in args[idx]:
-                val = args[idx]['Exists']
+    for data in args.values():
+        if 'Name' in data:
+            if  'Value' in data:
+                expected_value = data['Value']
+            elif  'Exists' in data:
+                val = data['Exists']
                 expected_value = not (val == 'false')
-            expectations.add((args[idx]['Name'], expected_value))
+            expectations.add((data['Name'], expected_value))
     
     return expectations
 
@@ -55,17 +55,17 @@ def extract_deletions_from_query_params(req):
     args = extract_numbered_args(DELETE_QUERY_ARG_REGEX, req)
     
     deletions = {}
-    for idx, data in args.iteritems():
-        if 'Name' not in args[idx]:
+    for data in args.values():
+        if 'Name' not in data:
             continue
     
-        attr_name = args[idx]['Name']
+        attr_name = data['Name']
     
         if attr_name not in deletions:
             deletions[attr_name] = set()
     
-        if 'Value' in args[idx]:
-            deletions[attr_name].add(args[idx]['Value'])
+        if 'Value' in data:
+            deletions[attr_name].add(data['Value'])
         else:
             import basicdb
             deletions[attr_name].add(basicdb.AllAttributes)
