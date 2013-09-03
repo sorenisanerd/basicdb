@@ -1,12 +1,13 @@
 import re
 
+BATCH_PUT_ATTRIBUTE_QUERY_REGEX = re.compile(r'Item\.(\d+)\.(.*)')
 PUT_ATTRIBUTE_QUERY_REGEX = re.compile(r'Attribute\.(\d+)\.(Name|Value|Replace)')
 DELETE_QUERY_ARG_REGEX = re.compile(r'Attribute\.(\d+)\.(Name|Value)')
 EXPECTED_QUERY_ARG_REGEX = re.compile(r'Expected\.(\d+)\.(Name|Value|Exists)')
 
-def extract_numbered_args(regex, req):
+def extract_numbered_args(regex, params):
     attrs = {}
-    for (k, v) in req._params.iteritems():
+    for (k, v) in params.iteritems():
         match = regex.match(k)
         if not match:
             continue
@@ -17,8 +18,35 @@ def extract_numbered_args(regex, req):
         attrs[idx][elem] = v
     return attrs
      
+def extract_batch_additions_and_replacements_from_query_params(req): 
+    args = extract_numbered_args(BATCH_PUT_ATTRIBUTE_QUERY_REGEX, req._params)
+
+    additions = {}
+    replacements = {}
+    for data in args.values():
+        if 'ItemName' in data:
+            item_name = data['ItemName']
+            subargs = extract_numbered_args(PUT_ATTRIBUTE_QUERY_REGEX, data)
+            for subdata in subargs.values():
+                if 'Name' in subdata and 'Value' in subdata:
+                    attr_name = subdata['Name']
+                    attr_value = subdata['Value']
+                    if 'Replace' in subdata and subdata['Replace'] == 'true':
+                        if item_name not in replacements:
+                            replacements[item_name] = {}
+                        if attr_name not in replacements[item_name]:
+                            replacements[item_name][attr_name] = set()
+                        replacements[item_name][attr_name].add(attr_value)
+                    else:
+                        if item_name not in additions:
+                            additions[item_name] = {}
+                        if attr_name not in additions[item_name]:
+                            additions[item_name][attr_name] = set()
+                        additions[item_name][attr_name].add(attr_value)
+    return additions, replacements
+    
 def extract_additions_and_replacements_from_query_params(req): 
-    args = extract_numbered_args(PUT_ATTRIBUTE_QUERY_REGEX, req)
+    args = extract_numbered_args(PUT_ATTRIBUTE_QUERY_REGEX, req._params)
     
     additions = {}
     replacements = {}
@@ -37,7 +65,7 @@ def extract_additions_and_replacements_from_query_params(req):
     return additions, replacements
 
 def extract_expectations_from_query_params(req):
-    args = extract_numbered_args(EXPECTED_QUERY_ARG_REGEX, req)
+    args = extract_numbered_args(EXPECTED_QUERY_ARG_REGEX, req._params)
 
     expectations = set()
     for data in args.values():
@@ -52,7 +80,7 @@ def extract_expectations_from_query_params(req):
     return expectations
 
 def extract_deletions_from_query_params(req):
-    args = extract_numbered_args(DELETE_QUERY_ARG_REGEX, req)
+    args = extract_numbered_args(DELETE_QUERY_ARG_REGEX, req._params)
     
     deletions = {}
     for data in args.values():

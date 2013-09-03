@@ -166,13 +166,15 @@ class BotoTests(FunctionalTests):
 
         self.conn.delete_domain('test-domain')
 
-    def _test_batch_add_items(self):
+    def test_batch_add_items(self):
         self.conn.create_domain('test-domain')
-        dom = self.conn.get_domain('test-domain')
+        dom = self.conn.get_domain('test-domain', validate=False)
 
         items = {'item1':{'attr1':'val1'},'item2':{'attr2':'val2'}}
         dom.batch_put_attributes(items)
 
+        self.assertEquals(dom.get_attributes('item1'), {'attr1': 'val1'})
+        self.assertEquals(dom.get_attributes('item2'), {'attr2': 'val2'})
         self.conn.delete_domain('test-domain')
 
 

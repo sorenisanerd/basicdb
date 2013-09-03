@@ -21,6 +21,7 @@ class AllAttributes(object):
 class DomainResource(object):
     def on_get(self, req, resp):
         start_time = time.time()
+        import sys
 
         metadata = etree.Element("ResponseMetadata")
         etree.SubElement(metadata, "RequestId").text = str(uuid.uuid4())
@@ -75,6 +76,19 @@ class DomainResource(object):
                 resp.status = e.http_status
                 dom = etree.Element(e.root_element)
 
+        elif action == "BatchPutAttributes":
+            domain_name = req.get_param("DomainName")
+
+            additions, replacements = utils.extract_batch_additions_and_replacements_from_query_params(req)
+
+            try:
+                backend.batch_put_attributes(domain_name, additions, replacements)
+                resp.status = falcon.HTTP_200
+                dom = etree.Element("BatchPutAttributesResponse")
+            except basicdb.exceptions.APIException, e:
+                resp.status = e.http_status
+                dom = etree.Element(e.root_element)
+
         elif action == "Select":
             sql_expr = urllib.unquote(req.get_param('SelectExpression'))
             results = backend.select(sql_expr)
@@ -111,6 +125,8 @@ class DomainResource(object):
                     etree.SubElement(attr_elem, "Name").text = attr_name
                     etree.SubElement(attr_elem, "Value").text = attr_value
         else:
+            resp.status = falcon.HTTP_500
+            dom = etree.Element("UnknownCommand")
             print "Unknown action: %s" % (action,)
 
         time_spent = time.time() - start_time

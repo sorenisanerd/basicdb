@@ -14,6 +14,25 @@ class StorageBackend(object):
         """List domains"""
         raise NotImplementedError()
 
+    def batch_put_attributes(self, domain_name, additions, replacements):
+        """Update attributes on multiple items at a time
+        
+        replacements is a dict where keys are item names and the corresponding
+        value is another dict where keys are attribute names and the
+        corresponding value is a set of values that are to replace any current
+        values associated with the given attribute.
+        additions is a dict where keys are item names and the corresponding
+        value is another dict where keys are attribute names and the
+        corresponding value is a set of values that are to be added to the
+        given attribute.
+        
+        If the backend does not have a quick mechanism for this, just leave
+        this method alone and implement some of the more low-level methods"""
+        for item_name in set(additions.keys() + replacements.keys()):
+            self.put_attributes(domain_name, item_name,
+                                additions.get(item_name, {}),
+                                replacements.get(item_name, {}))
+
     def put_attributes(self, domain_name, item_name, additions, replacements,
                        expectations=None):
         """Update the set of attributes on the given item:
