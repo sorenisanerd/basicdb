@@ -16,10 +16,10 @@ The following API calls work (sufficiently to make the positive tests pass):
  * ListDomains
  * PutAttributes
  * Select
+ * BatchPutAttributes
 
 The following API calls do not work yet at all:
  * BatchDeleteAttributes
- * BatchPutAttributes
 
 Other things BasicDB doesn't do:
  * Authentication
