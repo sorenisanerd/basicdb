@@ -1,11 +1,11 @@
 import falcon
 import importlib
-import re
 import time
 import urllib
 import uuid
 import xml.etree.cElementTree as etree
 
+from basicdb import utils
 import basicdb.exceptions
 
 backend_driver = 'fake'
@@ -52,32 +52,8 @@ class DomainResource(object):
             domain_name = req.get_param("DomainName")
             item_name = req.get_param("ItemName")
 
-            attrs = {}
-            r = re.compile(r'Attribute\.(\d+)\.(Name|Value)')
-            for (k, v) in req._params.iteritems():
-                match = r.match(k)
-                if not match:
-                    continue
-
-                idx, elem = match.groups()
-                if idx not in attrs:
-                    attrs[idx] = {}
-                attrs[idx][elem] = v
-
-            deletions = {}
-            for idx, data in attrs.iteritems():
-                if 'Name' not in attrs[idx]:
-                    continue
-
-                attr_name = attrs[idx]['Name']
-
-                if attr_name not in deletions:
-                    deletions[attr_name] = set()
-
-                if 'Value' in attrs[idx]:
-                    deletions[attr_name].add(attrs[idx]['Value'])
-                else:
-                    deletions[attr_name].add(AllAttributes)
+            deletions = utils.extract_deletions_from_query_params(req)
+            expectations = utils.extract_expectations_from_query_params(req)
 
             backend.delete_attributes(domain_name, item_name, deletions)
 
@@ -87,56 +63,8 @@ class DomainResource(object):
             domain_name = req.get_param("DomainName")
             item_name = req.get_param("ItemName")
 
-            attrs = {}
-            r = re.compile(r'Attribute\.(\d+)\.(Name|Value|Replace)')
-            for (k, v) in req._params.iteritems():
-                match = r.match(k)
-                if not match:
-                    continue
-
-                idx, elem = match.groups()
-                if idx not in attrs:
-                    attrs[idx] = {}
-                attrs[idx][elem] = v
-
-            additions = {}
-            replacements = {}
-            for idx, data in attrs.iteritems():
-                if 'Name' in attrs[idx] and 'Value' in attrs[idx]:
-                    name = attrs[idx]['Name']
-                    value = attrs[idx]['Value']
-                    if 'Replace' in attrs[idx] and attrs[idx]['Replace'] == 'true':
-                        if name not in replacements:
-                            replacements[name] = set()
-                        replacements[name].add(value)
-                    else:
-                        if name not in additions:
-                            additions[name] = set()
-                        additions[name].add(value)
-
-            expectation_params = {}
-            r = re.compile(r'Expected\.(\d+)\.(Name|Value|Exists)')
-            for (k, v) in req._params.iteritems():
-                match = r.match(k)
-                if not match:
-                    continue
-
-                idx, elem = match.groups()
-                if idx not in expectation_params:
-                    expectation_params[idx] = {}
-                expectation_params[idx][elem] = v
-
-            expectations = []
-            for idx, data in expectation_params.iteritems():
-                if 'Name' in expectation_params[idx]:
-                    if  'Value' in expectation_params[idx]:
-                        expected_value = expectation_params[idx]['Value']
-                    elif  'Exists' in expectation_params[idx]:
-                        val = expectation_params[idx]['Exists']
-                        expected_value = not (val == 'false')
-                    expectations += [(expectation_params[idx]['Name'],
-                                     expected_value)]
-
+            additions, replacements = utils.extract_additions_and_replacements_from_query_params(req)
+            expectations = utils.extract_expectations_from_query_params(req)
 
             try:
                 backend.put_attributes(domain_name, item_name, additions, replacements,
