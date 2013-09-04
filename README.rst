@@ -23,5 +23,3 @@ The following API calls work (sufficiently to make the positive tests pass):
 
 Things BasicDB doesn't do:
  * Authentication
- * Persistence (all data evaporates on restart)
-
