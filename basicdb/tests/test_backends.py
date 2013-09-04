@@ -94,6 +94,22 @@ class BaseStorageBackendTests(unittest2.TestCase):
                       self.put_attributes_call_args)
         self.assertIn(("domain", "item2", {}, {"attr2": set(["attr2val1"])}), 
                       self.put_attributes_call_args)
+
+    def test_batch_delete_attributes(self):
+        self.delete_attributes_call_args = []
+        class TestStoreBackend(basicdb.backends.StorageBackend):
+            def delete_attributes(self2, *args):
+                self.delete_attributes_call_args += [args]
+
+        backend = TestStoreBackend()
+        backend.batch_delete_attributes("domain",
+                                        {"item1": {"attr1": set(["attr1val1", "attr1val2"])},
+                                        "item2": {"attr2": set(["attr2val1"])}})
+
+        self.assertIn(("domain", "item1", {"attr1": set(["attr1val1", "attr1val2"])}), 
+                      self.delete_attributes_call_args)
+        self.assertIn(("domain", "item2", {"attr2": set(["attr2val1"])}), 
+                      self.delete_attributes_call_args)
                 
     def test_get_attributes_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
@@ -313,6 +329,33 @@ class _GenericBackendDriverTest(unittest2.TestCase):
 
         self.assertEquals(self.backend.get_attributes("domain1", "item1"),
                           {"d": set(["e"])})
+
+    def test_batch_delete_attributes(self):
+        self.backend.create_domain("domain1")
+        self.backend.put_attributes("domain1", "item1",
+                                    {"a": set(["b", "c"]),
+                                     "d": set(["e"]),
+                                     "f": set(["g"])},
+                                     {})
+
+        self.backend.put_attributes("domain1", "item2",
+                                    {"h": set(["i"]),
+                                     "j": set(["k"])},
+                                     {})
+
+        self.backend.batch_delete_attributes("domain1",
+                                             {"item1": 
+                                               {"a": set([basicdb.AllAttributes]),
+                                                "d": set(["f"]),
+                                                "f": set(["g"])},
+                                              "item2":
+                                               {"j": set(["k"])}})
+
+        self.assertEquals(self.backend.get_attributes("domain1", "item1"),
+                          {"d": set(["e"])})
+
+        self.assertEquals(self.backend.get_attributes("domain1", "item2"),
+                          {"h": set(["i"])})
 
     def test_select(self):
         self.backend.create_domain("domain1")

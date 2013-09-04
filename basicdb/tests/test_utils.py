@@ -32,6 +32,26 @@ class UtilsTests(unittest2.TestCase):
                                  '7': {'Value': 'attr7val1',
                                        'Replace': 'attr7replace'}})
       
+    def test_extract_batch_deletions_from_query_params(self):
+        request = self._create_request({'Item.1.ItemName': 'item1',
+                                        'Item.1.Attribute.1.Name': 'attr1',
+                                        'Item.1.Attribute.1.Value': 'attr1val1',
+                                        'Item.3.ItemName': 'item3',
+                                        'Item.3.Attribute.3.Name': 'attr3',
+                                        'Item.3.Attribute.3.Value': 'attr3val1',
+                                        'Item.1.Attribute.6.Name': 'attr6',
+                                        'Item.1.Attribute.7.Name': 'attr7',
+                                        'Item.1.Attribute.7.Value': 'attr7val1',
+                                        'Item.1.Attribute.7.Replace': 'true',
+                                        'Item.1.Attribute.8.Foobar': 'blah'})
+
+        deletions = utils.extract_batch_deletions_from_query_params(request)
+
+        self.assertEquals(deletions, {'item1': {'attr1': set(['attr1val1']),
+                                                'attr6': set([basicdb.AllAttributes]),
+                                                'attr7': set(["attr7val1"])},
+                                      'item3': {'attr3': set(['attr3val1'])}})
+
     def test_extract_batch_additions_and_replacements_from_query_params(self):
         request = self._create_request({'Item.1.ItemName': 'item1',
                                         'Item.1.Attribute.1.Name': 'attr1',

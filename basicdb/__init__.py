@@ -76,6 +76,19 @@ class DomainResource(object):
                 resp.status = e.http_status
                 dom = etree.Element(e.root_element)
 
+        elif action == "BatchDeleteAttributes":
+            domain_name = req.get_param("DomainName")
+
+            deletions = utils.extract_batch_deletions_from_query_params(req)
+
+            try:
+                backend.batch_delete_attributes(domain_name, deletions)
+                resp.status = falcon.HTTP_200
+                dom = etree.Element("BatchDeleteAttributesResponse")
+            except basicdb.exceptions.APIException, e:
+                resp.status = e.http_status
+                dom = etree.Element(e.root_element)
+
         elif action == "BatchPutAttributes":
             domain_name = req.get_param("DomainName")
 

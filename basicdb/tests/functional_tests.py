@@ -178,5 +178,28 @@ class BotoTests(FunctionalTests):
         self.conn.delete_domain('test-domain')
 
 
+    def test_batch_delete_items(self):
+        self.conn.create_domain('test-domain')
+        dom = self.conn.get_domain('test-domain', validate=False)
+
+        items = {'item1':{'attr1':'val1'},'item2':{'attr2':'val2'}}
+        dom.batch_put_attributes(items)
+
+        items = {'item1':{'attr1':'val2'},'item2':{'attr3':'val3'}}
+        dom.batch_put_attributes(items, replace=False)
+
+        item1_attrs = dom.get_attributes('item1')
+        self.assertEquals(len(item1_attrs), 1)
+        self.assertEquals(set(item1_attrs['attr1']), set(["val1", "val2"]))
+
+        item2_attrs = dom.get_attributes('item2')
+        self.assertEquals(item2_attrs, {"attr2": "val2", "attr3": "val3"})
+
+        dom.batch_delete_attributes({"item1": {"attr1": "val2"}, "item2": None})
+
+        item1_attrs = dom.get_attributes('item1')
+        self.assertEquals(item1_attrs, {"attr1": "val1"})
+        
+
 if __name__ == "__main__":
     unittest2.main()

@@ -17,8 +17,6 @@ The following API calls work (sufficiently to make the positive tests pass):
  * PutAttributes
  * Select
  * BatchPutAttributes
-
-The following API calls do not work yet at all:
  * BatchDeleteAttributes
 
 Other things BasicDB doesn't do:

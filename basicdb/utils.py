@@ -1,6 +1,6 @@
 import re
 
-BATCH_PUT_ATTRIBUTE_QUERY_REGEX = re.compile(r'Item\.(\d+)\.(.*)')
+BATCH_QUERY_REGEX = re.compile(r'Item\.(\d+)\.(.*)')
 PUT_ATTRIBUTE_QUERY_REGEX = re.compile(r'Attribute\.(\d+)\.(Name|Value|Replace)')
 DELETE_QUERY_ARG_REGEX = re.compile(r'Attribute\.(\d+)\.(Name|Value)')
 EXPECTED_QUERY_ARG_REGEX = re.compile(r'Expected\.(\d+)\.(Name|Value|Exists)')
@@ -19,7 +19,7 @@ def extract_numbered_args(regex, params):
     return attrs
      
 def extract_batch_additions_and_replacements_from_query_params(req): 
-    args = extract_numbered_args(BATCH_PUT_ATTRIBUTE_QUERY_REGEX, req._params)
+    args = extract_numbered_args(BATCH_QUERY_REGEX, req._params)
 
     additions = {}
     replacements = {}
@@ -44,6 +44,31 @@ def extract_batch_additions_and_replacements_from_query_params(req):
                             additions[item_name][attr_name] = set()
                         additions[item_name][attr_name].add(attr_value)
     return additions, replacements
+
+def extract_batch_deletions_from_query_params(req): 
+    args = extract_numbered_args(BATCH_QUERY_REGEX, req._params)
+
+    deletions = {}
+    for data in args.values():
+        if 'ItemName' in data:
+            item_name = data['ItemName']
+            subargs = extract_numbered_args(DELETE_QUERY_ARG_REGEX, data)
+            for subdata in subargs.values():
+                if 'Name' not in subdata:
+                    continue
+    
+                attr_name = subdata['Name']
+                if item_name not in deletions:
+                     deletions[item_name] = {}
+                if attr_name not in deletions[item_name]:
+                    deletions[item_name][attr_name] = set()
+
+                if 'Value' in subdata:
+                    deletions[item_name][attr_name].add(subdata['Value'])
+                else:
+                    import basicdb
+                    deletions[item_name][attr_name].add(basicdb.AllAttributes)
+    return deletions
     
 def extract_additions_and_replacements_from_query_params(req): 
     args = extract_numbered_args(PUT_ATTRIBUTE_QUERY_REGEX, req._params)

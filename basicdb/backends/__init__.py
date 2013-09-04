@@ -91,6 +91,14 @@ class StorageBackend(object):
         self.delete_attributes(domain_name, item_name, {attr_name: set([basicdb.AllAttributes])})
         self.add_attribute(domain_name, item_name, attr_name, attr_values)
 
+    def batch_delete_attributes(self, domain_name, deletions):
+        """Delete attributes on multiple items at a time
+        
+        If the backend does not have a quick mechanism for this, just leave
+        this method alone and implement some of the more low-level methods"""
+        for item_name, item_deletions in deletions.iteritems():
+            self.delete_attributes(domain_name, item_name, item_deletions)
+
     def delete_attributes(self, domain_name, item_name, deletions):
         for attr_name, attr_values in deletions.iteritems():
             self.delete_attribute(domain_name, item_name, attr_name, attr_values)
