@@ -58,9 +58,9 @@ class FunctionalTests(unittest2.TestCase):
     def tearDown(self):
         self.kill_server()
 
-class BotoTests(FunctionalTests):
+class _BotoTests(FunctionalTests):
     def setUp(self):
-        super(BotoTests, self).setUp()
+        super(_BotoTests, self).setUp()
 
         local_region = boto.regioninfo.RegionInfo(name='local',
                                                   endpoint='localhost')
@@ -199,6 +199,17 @@ class BotoTests(FunctionalTests):
 
         item1_attrs = dom.get_attributes('item1')
         self.assertEquals(item1_attrs, {"attr1": "val1"})
+        
+class FakeBackedBotoTests(_BotoTests):
+    @classmethod
+    def setUpClass(cls):
+        basicdb.load_backend('fake')
+        
+ 
+class FilesystemBackedBotoTests(_BotoTests):
+    @classmethod
+    def setUpClass(cls):
+        basicdb.load_backend('filesystem')
         
 
 if __name__ == "__main__":

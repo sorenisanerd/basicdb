@@ -1,5 +1,6 @@
 import falcon
 import importlib
+import os
 import time
 import urllib
 import uuid
@@ -8,9 +9,14 @@ import xml.etree.cElementTree as etree
 from basicdb import utils
 import basicdb.exceptions
 
-backend_driver = 'fake'
+global backend
+backend = None
 
-backend =  importlib.import_module('basicdb.backends.%s' % (backend_driver,)).driver
+def load_backend(name):
+    global backend
+    backend = importlib.import_module('basicdb.backends.%s' % (name,)).driver
+
+load_backend(os.environ.get('BASICDB_BACKEND_DRIVER', 'fake'))
 
 class Authentication(object):
     pass
@@ -21,7 +27,6 @@ class AllAttributes(object):
 class DomainResource(object):
     def on_get(self, req, resp):
         start_time = time.time()
-        import sys
 
         metadata = etree.Element("ResponseMetadata")
         etree.SubElement(metadata, "RequestId").text = str(uuid.uuid4())

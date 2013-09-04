@@ -417,6 +417,14 @@ class FakeBackendDriverTest(_GenericBackendDriverTest):
     def setUp(self):
         import basicdb.backends.fake
         self.backend = basicdb.backends.fake.driver
+
+    def tearDown(self):
         self.backend._reset()
 
+class FilesystemBackendDriverTest(_GenericBackendDriverTest):
+    def setUp(self):
+        import basicdb.backends.filesystem
+        self.backend = basicdb.backends.filesystem.driver
 
+    def tearDown(self):
+        self.backend._reset()
