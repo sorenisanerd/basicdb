@@ -9,7 +9,10 @@ httplib2==0.8
 ipython==1.0.0
 nose==1.3.0
 nose-cov==1.6
+protobuf==2.4.1
 pyparsing==2.0.1
+-e git+https://github.com/basho/riak-python-client.git@6d4af99b2c14cc4a82aaacdcc3480262a2f9cb55#egg=riak-dev
+riak-pb==1.4.1.1
 six==1.3.0
 unittest2==0.5.1
 wsgiref==0.1.2

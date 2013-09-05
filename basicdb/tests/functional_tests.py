@@ -221,6 +221,11 @@ class FilesystemBackedBotoTests(_BotoTests):
     def setUpClass(cls):
         basicdb.load_backend('filesystem')
         
+class RiakBackedBotoTests(_BotoTests):
+    @classmethod
+    def setUpClass(cls):
+        basicdb.load_backend('riak')
+        
 
 if __name__ == "__main__":
     unittest2.main()

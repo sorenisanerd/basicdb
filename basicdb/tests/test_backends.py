@@ -428,3 +428,11 @@ class FilesystemBackendDriverTest(_GenericBackendDriverTest):
 
     def tearDown(self):
         self.backend._reset()
+
+class RiakBackendDriverTest(_GenericBackendDriverTest):
+    def setUp(self):
+        import basicdb.backends.riak
+        self.backend = basicdb.backends.riak.driver
+
+    def tearDown(self):
+        self.backend._reset()
