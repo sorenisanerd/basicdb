@@ -6,57 +6,70 @@ import basicdb.backends
 import basicdb.sqlparser as sqlparser
 
 class FakeBackend(basicdb.backends.StorageBackend):
-    _domains = {}
+    _users = {}
 
     def _reset(self):
-        self._domains = {}
+        self._users = {}
 
-    def create_domain(self, domain_name):
-        self._domains[domain_name] = {}
+    def _ensure_owner(self, owner):
+        if not owner in self._users:
+            self._users[owner] = {}
 
-    def delete_domain(self, domain_name):
-        del self._domains[domain_name]
+    def create_domain(self, owner, domain_name):
+        self._ensure_owner(owner)
+        self._users[owner][domain_name] = {}
 
-    def list_domains(self):
-        return self._domains.keys() 
+    def delete_domain(self, owner, domain_name):
+        self._ensure_owner(owner)
+        del self._users[owner][domain_name]
 
-    def delete_attribute_all(self, domain_name, item_name, attr_name):
-        if domain_name not in self._domains:
+    def list_domains(self, owner):
+        self._ensure_owner(owner)
+        return self._users[owner].keys() 
+
+    def delete_attribute_all(self, owner, domain_name, item_name, attr_name):
+        self._ensure_owner(owner)
+        if domain_name not in self._users[owner]:
             return
 
-        if item_name not in self._domains[domain_name]:
+        if item_name not in self._users[owner][domain_name]:
             return
 
-        if attr_name in self._domains[domain_name][item_name]:
-            del self._domains[domain_name][item_name][attr_name]
+        if attr_name in self._users[owner][domain_name][item_name]:
+            del self._users[owner][domain_name][item_name][attr_name]
 
-    def delete_attribute_value(self, domain_name, item_name, attr_name, attr_value):
-        if (domain_name in self._domains and
-            item_name in self._domains[domain_name] and
-            attr_name in self._domains[domain_name][item_name]):
+    def delete_attribute_value(self, owner, domain_name, item_name, attr_name, attr_value):
+        self._ensure_owner(owner)
+        if (domain_name in self._users[owner] and
+            item_name in self._users[owner][domain_name] and
+            attr_name in self._users[owner][domain_name][item_name]):
             try:
-                self._domains[domain_name][item_name][attr_name].remove(attr_value)
+                self._users[owner][domain_name][item_name][attr_name].remove(attr_value)
             except KeyError:
                 pass
-            if not self._domains[domain_name][item_name][attr_name]:
-                del self._domains[domain_name][item_name][attr_name]
+            if not self._users[owner][domain_name][item_name][attr_name]:
+                del self._users[owner][domain_name][item_name][attr_name]
 
-    def add_attribute_value(self, domain_name, item_name, attr_name, attr_value):
-        if not item_name in self._domains[domain_name]:
-            self._domains[domain_name][item_name] = {}
+    def add_attribute_value(self, owner, domain_name, item_name, attr_name, attr_value):
+        self._ensure_owner(owner)
+        if not item_name in self._users[owner][domain_name]:
+            self._users[owner][domain_name][item_name] = {}
 
-        if not attr_name in self._domains[domain_name][item_name]:
-            self._domains[domain_name][item_name][attr_name] = set()
+        if not attr_name in self._users[owner][domain_name][item_name]:
+            self._users[owner][domain_name][item_name][attr_name] = set()
 
-        self._domains[domain_name][item_name][attr_name].add(attr_value)
+        self._users[owner][domain_name][item_name][attr_name].add(attr_value)
 
-    def get_attributes(self, domain_name, item_name):
-        return self._domains[domain_name][item_name]
+    def get_attributes(self, owner, domain_name, item_name):
+        self._ensure_owner(owner)
+        return self._users[owner][domain_name][item_name]
 
-    def _get_all_items(self, domain_name):
-        return self._domains[domain_name]
+    def _get_all_items(self, owner, domain_name):
+        self._ensure_owner(owner)
+        return self._users[owner][domain_name]
 
-    def select(self, sql_expr):
+    def select(self, owner, sql_expr):
+        self._ensure_owner(owner)
         parsed = sqlparser.simpleSQL.parseString(sql_expr)
         domain_name = parsed.tables[0] # Only one table supported
         desired_attributes = parsed.columns
@@ -72,7 +85,7 @@ class FakeBackend(basicdb.backends.StorageBackend):
                     filters += [lambda x:any([regex.match(f) for f in x.get(col_name, [])])]
 
         matching_items = {}
-        for item, item_attrs in self._get_all_items(domain_name).iteritems():
+        for item, item_attrs in self._get_all_items(owner, domain_name).iteritems():
             if all(f(item_attrs) for f in filters):
                 matching_items[item] = item_attrs
 
@@ -88,23 +101,25 @@ class FakeBackend(basicdb.backends.StorageBackend):
 
         return result
 
-    def domain_metadata(self, domain_name):
-        return {"ItemCount": len(self._domains[domain_name]),
-                "ItemNamesSizeBytes": sum((len(s) for s in self._domains[domain_name].keys())),
+    def domain_metadata(self, owner, domain_name):
+        self._ensure_owner(owner)
+        return {"ItemCount": len(self._users[owner][domain_name]),
+                "ItemNamesSizeBytes": sum((len(s) for s in self._users[owner][domain_name].keys())),
                 "AttributeNameCount": '12',
                 "AttributeNamesSizeBytes": '120',
                 "AttributeValueCount": '120',
                 "AttributeValuesSizeBytes": '100020',
                 "Timestamp": str(int(time.time()))}
 
-    def check_expectation(self, domain_name, item_name, expectation):
-        if (domain_name not in self._domains or
-            item_name not in self._domains[domain_name]):
+    def check_expectation(self, owner, domain_name, item_name, expectation):
+        self._ensure_owner(owner)
+        if (domain_name not in self._users[owner] or
+            item_name not in self._users[owner][domain_name]):
             return False
 
         attr_name, attr_value_expected = expectation
 
-        attr_value = self._domains[domain_name][item_name].get(attr_name, False)
+        attr_value = self._users[owner][domain_name][item_name].get(attr_name, False)
 
         if attr_value == False:
             if attr_value_expected == False:

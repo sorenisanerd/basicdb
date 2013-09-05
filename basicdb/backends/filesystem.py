@@ -21,8 +21,8 @@ class FileSystemBackend(basicdb.backends.StorageBackend):
     def _md5_hex(self, s):
         return md5.md5(s).hexdigest()
 
-    def _attr_value_filename(self, domain_name, item_name, attr_name, attr_value):
-        return os.path.join(self._attr_dir(domain_name, item_name, attr_name),
+    def _attr_value_filename(self, owner, domain_name, item_name, attr_name, attr_value):
+        return os.path.join(self._attr_dir(owner, domain_name, item_name, attr_name),
                             self._md5_hex(attr_value))
 
     def _reset(self):
@@ -36,71 +36,77 @@ class FileSystemBackend(basicdb.backends.StorageBackend):
                 raise
         os.mkdir(self.base_dir)
 
-    def _domain_dir(self, domain_name):
-        return os.path.join(self.base_dir, domain_name)
+    def _owner_dir(self, owner):
+        owner_dir = os.path.join(self.base_dir, owner)
+        if not os.path.exists(owner_dir):
+            os.makedirs(owner_dir)
+        return owner_dir
 
-    def _item_dir(self, domain_name, item_name):
-        return os.path.join(self._domain_dir(domain_name), item_name)
+    def _domain_dir(self, owner, domain_name):
+        return os.path.join(self._owner_dir(owner), domain_name)
 
-    def _attr_dir(self, domain_name, item_name, attr_name):
-        return os.path.join(self._item_dir(domain_name, item_name), attr_name)
+    def _item_dir(self, owner, domain_name, item_name):
+        return os.path.join(self._domain_dir(owner, domain_name), item_name)
 
-    def create_domain(self, domain_name):
+    def _attr_dir(self, owner, domain_name, item_name, attr_name):
+        return os.path.join(self._item_dir(owner, domain_name, item_name), attr_name)
+
+    def create_domain(self, owner, domain_name):
         try:
-            os.mkdir(self._domain_dir(domain_name))
+            os.mkdir(self._domain_dir(owner, domain_name))
         except OSError, e:
             if e.errno == errno.EEXIST:
                 pass
             else:
                 raise
 
-    def delete_domain(self, domain_name):
+    def delete_domain(self, owner, domain_name):
         try:
-            shutil.rmtree(self._domain_dir(domain_name))
+            shutil.rmtree(self._domain_dir(owner, domain_name))
         except OSError, e:
             if e.errno == errno.ENOENT:
                 pass
             else:
                 raise
 
-    def list_domains(self):
-        return [d.split('/')[-1] for d in glob.glob(os.path.join(self.base_dir, '*'))]
+    def list_domains(self, owner):
+        return [d.split('/')[-1] for d in glob.glob(os.path.join(self._owner_dir(owner), '*'))]
 
-    def delete_attribute_all(self, domain_name, item_name, attr_name):
-        attr_dir = self._attr_dir(domain_name, item_name, attr_name)
+    def delete_attribute_all(self, owner, domain_name, item_name, attr_name):
+        attr_dir = self._attr_dir(owner, domain_name, item_name, attr_name)
         if os.path.exists(attr_dir):
             shutil.rmtree(attr_dir)
 
-    def delete_attribute_value(self, domain_name, item_name, attr_name, attr_value):
+    def delete_attribute_value(self, owner, domain_name, item_name, attr_name, attr_value):
         try:
-            os.unlink(self._attr_value_filename(domain_name, item_name, attr_name, attr_value))
+            os.unlink(self._attr_value_filename(owner, domain_name, item_name, attr_name, attr_value))
         except OSError, e:
             if e.errno == errno.ENOENT:
                 pass
             else:
                 raise
         try:
-            os.rmdir(self._attr_dir(domain_name, item_name, attr_name))
+            os.rmdir(self._attr_dir(owner, domain_name, item_name, attr_name))
         except OSError, e:
             if e.errno in (errno.ENOTEMPTY, errno.ENOENT):
                 pass
             else:
                 raise
 
-    def add_attribute_value(self, domain_name, item_name, attr_name, attr_value):
+    def add_attribute_value(self, owner, domain_name, item_name, attr_name, attr_value):
         try:
-            os.makedirs(self._attr_dir(domain_name, item_name, attr_name))
+            os.makedirs(self._attr_dir(owner, domain_name, item_name, attr_name))
         except OSError, e:
             if e.errno == errno.EEXIST:
                 pass
 
-        with file(self._attr_value_filename(domain_name, item_name,
+        with file(self._attr_value_filename(owner, domain_name, item_name,
                                             attr_name, attr_value), 'w') as fp:
             fp.write(attr_value)
 
-    def get_attributes(self, domain_name, item_name):
+    def get_attributes(self, owner, domain_name, item_name):
         retval = {}
-        for attr_dir in glob.glob(os.path.join(self._item_dir(domain_name, item_name), '*')):
+        for attr_dir in glob.glob(os.path.join(self._item_dir(owner, domain_name, item_name), '*')):
             attr_name = attr_dir.split('/')[-1]
             retval[attr_name] = set()
             for attr_value_file in glob.glob(os.path.join(attr_dir, '*')):
@@ -108,16 +114,16 @@ class FileSystemBackend(basicdb.backends.StorageBackend):
                     retval[attr_name].add(fp.read())
         return retval
 
-    def _get_all_items_names(self, domain_name):
-        return [d.split('/')[-1] for d in glob.glob(os.path.join(self._domain_dir(domain_name), '*'))]
+    def _get_all_items_names(self, owner, domain_name):
+        return [d.split('/')[-1] for d in glob.glob(os.path.join(self._domain_dir(owner, domain_name), '*'))]
 
-    def _get_all_items(self, domain_name):
+    def _get_all_items(self, owner, domain_name):
         retval = {}
-        for item_name in self._get_all_items_names(domain_name):
-            retval[item_name] = self.get_attributes(domain_name, item_name)
+        for item_name in self._get_all_items_names(owner, domain_name):
+            retval[item_name] = self.get_attributes(owner, domain_name, item_name)
         return retval
 
-    def select(self, sql_expr):
+    def select(self, owner, sql_expr):
         parsed = sqlparser.simpleSQL.parseString(sql_expr)
         domain_name = parsed.tables[0] # Only one table supported
         desired_attributes = parsed.columns
@@ -133,7 +139,7 @@ class FileSystemBackend(basicdb.backends.StorageBackend):
                     filters += [lambda x:any([regex.match(f) for f in x.get(col_name, [])])]
 
         matching_items = {}
-        for item, item_attrs in self._get_all_items(domain_name).iteritems():
+        for item, item_attrs in self._get_all_items(owner, domain_name).iteritems():
             if all(f(item_attrs) for f in filters):
                 matching_items[item] = item_attrs
 
@@ -149,8 +155,8 @@ class FileSystemBackend(basicdb.backends.StorageBackend):
 
         return result
 
-    def domain_metadata(self, domain_name):
-        return {"ItemCount": len(self._get_all_items_names(domain_name)),
+    def domain_metadata(self, owner, domain_name):
+        return {"ItemCount": len(self._get_all_items_names(owner, domain_name)),
                 "ItemNamesSizeBytes": '120',
                 "AttributeNameCount": '12',
                 "AttributeNamesSizeBytes": '120',
@@ -158,10 +164,10 @@ class FileSystemBackend(basicdb.backends.StorageBackend):
                 "AttributeValuesSizeBytes": '100020',
                 "Timestamp": str(int(time.time()))}
 
-    def check_expectation(self, domain_name, item_name, expectation):
+    def check_expectation(self, owner, domain_name, item_name, expectation):
         attr_name, attr_value_expected = expectation
 
-        attrs = self.get_attributes(domain_name, item_name)
+        attrs = self.get_attributes(owner, domain_name, item_name)
 
         attr_value = attrs.get(attr_name, False)
 

@@ -26,6 +26,7 @@ def run_server(port, server_ready, done):
     os.dup2(fp.fileno(), 1)
     os.dup2(fp.fileno(), 2)
 
+    os.environ['REMOTE_USER'] = 'fake'
     from wsgiref.simple_server import make_server
     s = make_server('localhost', port, basicdb.app)
 

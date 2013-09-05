@@ -31,18 +31,20 @@ class DomainResource(object):
         metadata = etree.Element("ResponseMetadata")
         etree.SubElement(metadata, "RequestId").text = str(uuid.uuid4())
 
+        owner = os.environ['REMOTE_USER']
+
         action = req.get_param("Action")
         if action == "CreateDomain":
             domain_name = req.get_param("DomainName")
 
-            backend.create_domain(domain_name)
+            backend.create_domain(owner, domain_name)
 
             resp.status = falcon.HTTP_200  # This is the default status
             dom = etree.Element("CreateDomainResponse")
         elif action == "DeleteDomain":
             domain_name = req.get_param("DomainName")
 
-            backend.delete_domain(domain_name)
+            backend.delete_domain(owner, domain_name)
 
             resp.status = falcon.HTTP_200  # This is the default status
             dom = etree.Element("DeleteDomainResponse")
@@ -51,7 +53,7 @@ class DomainResource(object):
             dom = etree.Element("ListDomainsResponse")
 
             result = etree.SubElement(dom, "ListDomainsResult")
-            for name in backend.list_domains():
+            for name in backend.list_domains(owner):
                 domain_name = etree.SubElement(result, "DomainName")
                 domain_name.text = name
         elif action == "DeleteAttributes":
@@ -61,7 +63,7 @@ class DomainResource(object):
             deletions = utils.extract_deletions_from_query_params(req)
             expectations = utils.extract_expectations_from_query_params(req)
 
-            backend.delete_attributes(domain_name, item_name, deletions)
+            backend.delete_attributes(owner, domain_name, item_name, deletions)
 
             resp.status = falcon.HTTP_200
             dom = etree.Element("DeleteAttributesResponse")
@@ -73,8 +75,8 @@ class DomainResource(object):
             expectations = utils.extract_expectations_from_query_params(req)
 
             try:
-                backend.put_attributes(domain_name, item_name, additions, replacements,
-                                       expectations)
+                backend.put_attributes(owner, domain_name, item_name, additions,
+                                       replacements, expectations)
                 resp.status = falcon.HTTP_200
                 dom = etree.Element("PutAttributesResponse")
             except basicdb.exceptions.APIException, e:
@@ -87,7 +89,7 @@ class DomainResource(object):
             deletions = utils.extract_batch_deletions_from_query_params(req)
 
             try:
-                backend.batch_delete_attributes(domain_name, deletions)
+                backend.batch_delete_attributes(owner, domain_name, deletions)
                 resp.status = falcon.HTTP_200
                 dom = etree.Element("BatchDeleteAttributesResponse")
             except basicdb.exceptions.APIException, e:
@@ -100,7 +102,7 @@ class DomainResource(object):
             additions, replacements = utils.extract_batch_additions_and_replacements_from_query_params(req)
 
             try:
-                backend.batch_put_attributes(domain_name, additions, replacements)
+                backend.batch_put_attributes(owner, domain_name, additions, replacements)
                 resp.status = falcon.HTTP_200
                 dom = etree.Element("BatchPutAttributesResponse")
             except basicdb.exceptions.APIException, e:
@@ -109,7 +111,7 @@ class DomainResource(object):
 
         elif action == "Select":
             sql_expr = urllib.unquote(req.get_param('SelectExpression'))
-            results = backend.select(sql_expr)
+            results = backend.select(owner, sql_expr)
 
             resp.status = falcon.HTTP_200
             dom = etree.Element("SelectResponse")
@@ -128,7 +130,7 @@ class DomainResource(object):
             resp.status = falcon.HTTP_200
             dom = etree.Element("DomainMetadataResponse")
             result = etree.SubElement(dom, "DomainMetadataResult")
-            for k, v in backend.domain_metadata(domain_name).iteritems():
+            for k, v in backend.domain_metadata(owner, domain_name).iteritems():
                 etree.SubElement(result, k).text = str(v)
         elif action == "GetAttributes":
             domain_name = req.get_param("DomainName")
@@ -137,7 +139,7 @@ class DomainResource(object):
             dom = etree.Element("GetAttributesResponse")
             result = etree.SubElement(dom, "GetAttributesResult")
 
-            for attr_name, attr_values in backend.get_attributes(domain_name, item_name).iteritems():
+            for attr_name, attr_values in backend.get_attributes(owner, domain_name, item_name).iteritems():
                 for attr_value in attr_values:
                     attr_elem = etree.SubElement(result, "Attribute")
                     etree.SubElement(attr_elem, "Name").text = attr_name
