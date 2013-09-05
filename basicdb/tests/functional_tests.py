@@ -1,6 +1,7 @@
 import boto
 import boto.exception
 import boto.regioninfo
+import errno
 import os
 from multiprocessing import Process, Event
 import signal
@@ -39,8 +40,16 @@ class FunctionalTests(unittest2.TestCase):
         existing_server = os.environ.get('BASICDB_PORT', False)
         if not existing_server:
             def kill_server():
-                os.kill(self.server.pid, signal.SIGINT)
-                self.server.join()
+                while True:
+                    try:
+                        os.kill(self.server.pid, signal.SIGINT)
+                        self.server.join(1)
+                    except OSError, e:
+                        if e.errno == errno.ESRCH:
+                            break
+                        raise
+                        
+
             self.server_ready = Event()
             self.done = Event()
             self.server = Process(target=run_server, args=(8000, self.server_ready, self.done))
