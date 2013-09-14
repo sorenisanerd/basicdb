@@ -80,8 +80,17 @@ class FakeBackend(basicdb.backends.StorageBackend):
                 col_name, rel, rval = clause
                 if rel == '=':
                     filters += [lambda x:any([f == rval for f in x.get(col_name, [])])]
+                elif rel == '>':
+                    def fn(rval):
+                        return lambda x:any([f > rval for f in x.get(col_name, [])])
+
+                    filters += [fn(rval)]
+                elif rel == '<':
+                    def fn(rval):
+                        return lambda x:any([f < rval for f in x.get(col_name, [])])
+                    filters += [fn(rval)]
                 elif rel == 'like':
-                    regex = re.compile(rval.replace('_', '.').replace('%', '.*'))
+                    regex = re.compile(rval.replace('*', '\*').replace('_', '.').replace('%', '.*'))
                     filters += [lambda x:any([regex.match(f) for f in x.get(col_name, [])])]
 
         matching_items = {}

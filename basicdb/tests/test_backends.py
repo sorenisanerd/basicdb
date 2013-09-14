@@ -357,6 +357,73 @@ class _GenericBackendDriverTest(unittest2.TestCase):
         self.assertEquals(self.backend.get_attributes("owner", "domain1", "item2"),
                           {"h": set(["i"])})
 
+    def _load_sample_query_data_set(self):
+        self.backend.create_domain('owner', 'mydomain')
+        self.backend.put_attributes('owner', 'mydomain', "0385333498",
+                                    {"Title": set(["The Sirens of Titan"]),
+                                     "Author": set(["Kurt Vonnegut"]),
+                                     "Year": set(["1959"]),
+                                     "Pages": set(["00336"]),
+                                     "Keyword": set(["Book", "Paperback"]),
+                                     "Rating": set(["*****", "5 stars", "Excellent"])}, {})
+
+        self.backend.put_attributes('owner', 'mydomain', "0802131786",
+                                    {"Title": set(["Tropic of Cancer"]),
+                                     "Author": set(["Henry Miller"]),
+                                     "Year": set(["1934"]),
+                                     "Pages": set(["00318"]),
+                                     "Keyword": set(["Book"]),
+                                     "Rating": set(["****"])}, {})
+
+        self.backend.put_attributes('owner', 'mydomain', "1579124585",
+                                    {"Title": set(["The Right Stuff"]),
+                                     "Author": set(["Tom Wolfe"]),
+                                     "Year": set(["1979"]),
+                                     "Pages": set(["00304"]),
+                                     "Keyword": set(["Book", "Hardcover", "American"]),
+                                     "Rating": set(["****", "4 stars"])}, {})
+
+        self.backend.put_attributes('owner', 'mydomain', "B000T9886K",
+                                    {"Title": set(["In Between"]),
+                                     "Author": set(["Paul Van Dyk"]),
+                                     "Year": set(["2007"]),
+                                     "Keyword": set(["CD", "Trance"]),
+                                     "Rating": set(["4 stars"])}, {})
+
+        self.backend.put_attributes('owner', 'mydomain', "B00005JPLW",
+                                    {"Title": set(["300"]),
+                                     "Author": set(["Zack Snyder"]),
+                                     "Year": set(["2007"]),
+                                     "Keyword": set(["DVD", "Action", "Frank Miller"]),
+                                     "Rating": set(["***", "3 stars", "Not bad"])}, {})
+
+        self.backend.put_attributes('owner', 'mydomain', "B000SF3NGK",
+                                    {"Title": set(["Heaven's Gonna Burn Your Eyes"]),
+                                     "Author": set(["Thievery Corporation"]),
+                                     "Year": set(["2002"]),
+                                     "Rating": set(["*****"])}, {})
+
+    def test_select2(self):
+        self._load_sample_query_data_set()
+        def f(expr, items):
+            self.assertEquals(set(self.backend.select("owner", expr).keys()),
+                              set(items))
+
+        f("select * from mydomain where Title = 'The Right Stuff'",
+          ["1579124585"])
+
+        f("select * from mydomain where Year > '1985'",
+          ["B000T9886K", "B00005JPLW", "B000SF3NGK"])
+
+        f("select * from mydomain where Rating like '****%'",
+          ["0385333498", "1579124585", "0802131786", "B000SF3NGK"])
+
+        f("select * from mydomain where Pages < '00320'",
+          ["1579124585", "0802131786"])
+
+        f("select * from mydomain where Year > '1975' and Year < '2008'",
+          ["1579124585", "B000T9886K", "B00005JPLW", "B000SF3NGK"])
+
     def test_select(self):
         self.backend.create_domain("owner", "domain1")
         self.backend.put_attributes("owner", "domain1", "item1",
