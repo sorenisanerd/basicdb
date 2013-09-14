@@ -209,6 +209,59 @@ class _BotoTests(FunctionalTests):
         item1_attrs = dom.get_attributes('item1')
         self.assertEquals(item1_attrs, {"attr1": "val1"})
 
+    def _load_sample_query_data_set(self):
+        dom = self.conn.create_domain('mydomain')
+        dom.put_attributes("0385333498",
+                           {"Title": "The Sirens of Titan",
+                            "Author": "Kurt Vonnegut",
+                            "Year": "1959",
+                            "Pages": "00336",
+                            "Keyword": ["Book", "Paperback"],
+                            "Rating": ["*****", "5 stars", "Excellent"]})
+
+        dom.put_attributes("0802131786",
+                           {"Title": "Tropic of Cancer",
+                            "Author": "Henry Miller",
+                            "Year": "1934",
+                            "Pages": "00318",
+                            "Keyword": "Book",
+                            "Rating": "****"})
+
+        dom.put_attributes("1579124585",
+                           {"Title": "The Right Stuff",
+                            "Author": "Tom Wolfe",
+                            "Year": "1979",
+                            "Pages": "00304",
+                            "Keyword": ["Book", "Hardcover", "American"],
+                            "Rating": ["****", "4 stars"]})
+
+        dom.put_attributes("B000T9886K",
+                           {"Title": "In Between",
+                            "Author": "Paul Van Dyk",
+                            "Year": "2007",
+                            "Keyword": ["CD", "Trance"],
+                            "Rating": "4 stars"})
+
+        dom.put_attributes("B00005JPLW",
+                           {"Title": "300",
+                            "Author": "Zack Snyder",
+                            "Year": "2007",
+                            "Keyword": ["DVD", "Action", "Frank Miller"],
+                            "Rating": ["***", "3 stars", "Not bad"]})
+
+        dom.put_attributes("B000SF3NGK",
+                           {"Title": "Heaven's Gonna Burn Your Eyes",
+                            "Author": "Thievery Corporation",
+                            "Year": "2002",
+                            "Rating": "*****"})
+        return dom
+
+    def test_select(self):
+        dom = self._load_sample_query_data_set()
+        res = dom.select("select * from mydomain where Title = 'The Right Stuff'")
+        for row in res:
+            print row
+
 
 class FakeBackedBotoTests(_BotoTests):
     @classmethod
@@ -216,13 +269,13 @@ class FakeBackedBotoTests(_BotoTests):
         basicdb.load_backend('fake')
 
 
-class FilesystemBackedBotoTests(_BotoTests):
+class _FilesystemBackedBotoTests(_BotoTests):
     @classmethod
     def setUpClass(cls):
         basicdb.load_backend('filesystem')
 
 
-class RiakBackedBotoTests(_BotoTests):
+class _RiakBackedBotoTests(_BotoTests):
     @classmethod
     def setUpClass(cls):
         basicdb.load_backend('riak')

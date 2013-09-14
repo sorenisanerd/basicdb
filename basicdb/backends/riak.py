@@ -25,6 +25,70 @@ For each item in the domain, there's a key in the corresponding bucket named "<i
 It holds a dictionary of {"attr_name": ["attrvalue1", "attrvalue2"...]}
 """
 
+cartesianProduct_js = '''
+  function crossProduct(sets) {
+    var n = sets.length, carets = [], args = [];
+
+    function init() {
+      for (var i = 0; i < n; i++) {
+        carets[i] = 0;
+        args[i] = sets[i][0];
+      }
+    }
+
+    function next() {
+      if (!args.length) {
+        init();
+        return true;
+      }
+      var i = n - 1;
+      carets[i]++;
+      if (carets[i] < sets[i].length) {
+        args[i] = sets[i][carets[i]];
+        return true;
+      }
+      while (carets[i] >= sets[i].length) {
+        if (i == 0) {
+          return false;
+        }
+        carets[i] = 0;
+        args[i] = sets[i][0];
+        carets[--i]++;
+      }
+      args[i] = sets[i][carets[i]];
+      return true;
+    }
+
+    return {
+      next: next,
+      do: function (block, _context) {
+        return block.apply(_context, args);
+      },
+      args: args
+    }
+  }'''
+        
+iterate_over_attrs_js = '''
+    m1 = new Array();
+    for (k in val) {
+        m2 = new Array();
+        for (var v in val[k]) {
+            m2.push([k, val[k][v]]);
+        }
+        m1.push(m2);
+    }
+    var xp = crossProduct(m1);
+    while (xp.next()) { 
+       args = xp.args;
+       vals = Object();
+       for (kv in args) {
+           vals[args[kv][0]] = args[kv][1];
+       }
+       XXXX
+    }
+'''
+ 
+
 class RiakBackend(basicdb.backends.StorageBackend):
     def __init__(self, base_bucket='basicdb'):
         self.riak = riak.RiakClient(pb_port=8087, protocol='pbc')
@@ -115,7 +179,7 @@ class RiakBackend(basicdb.backends.StorageBackend):
             item_object.data[attr_name] = [attr_value]
         else:
             item_object.data[attr_name].append(attr_value)
-        
+
         item_object.store()
 
     def get_attributes(self, owner, domain_name, item_name):
@@ -131,28 +195,19 @@ class RiakBackend(basicdb.backends.StorageBackend):
         import riak.mapreduce
         mapred = riak.mapreduce.RiakMapReduce(self.riak)
 
-        parsed = sqlparser.simpleSQL.parseString(sql_expr)
-        domain_name = parsed.tables[0] # Only one table supported
+        parsed = sqlparser.parse(sql_expr)
+        domain_name = parsed.table
         desired_attributes = parsed.columns
 
         mapred.add_bucket(self._domain_bucket_name(owner, domain_name))
-        
-        if parsed.where[0] == '':
+
+        if parsed.where_expr == '':
             item_filter_js_expr = 'matched = true;'
         else:
-            item_filter_js_expr = '''for (x in val) {
-                                         for (y in val[x]) {
-                                             if ('''
-            for clause in parsed.where[0][1:]:
-                col_name, rel, rval = clause
-                if rel == '=':
-                    item_filter_js_expr += "val[x][y] == '%s'" % (rval,)
-                elif rel == 'like':
-                    item_filter_js_expr += "val[x][y].match('%s')" % (rval.replace('_', '.').replace('%', '.*'),)
-            item_filter_js_expr += ''') { matched = true; break; } } }'''
+            item_filter_js_expr = iterate_over_attrs_js.replace('XXXX', 'if (%s) { matched=true; break; }' % (parsed.where_expr.riak_js_expr()))
 
 
-        if desired_attributes == '*':
+        if desired_attributes == ['*']:
             attr_filter_expr = 'true'
         else:
             attr_filter_expr = ' || '.join(["key == '%s'" % col for col in desired_attributes])
@@ -162,6 +217,8 @@ class RiakBackend(basicdb.backends.StorageBackend):
                           var val = JSON.parse(riakObject.values[0].data);
                           var matched = false;
                           var nonempty = false;
+
+                          %s
 
                           %s
 
@@ -179,7 +236,7 @@ class RiakBackend(basicdb.backends.StorageBackend):
                           } else {
                               return [[]];
                           }
-                      }''' % (item_filter_js_expr, attr_filter_expr,)
+                      }''' % (cartesianProduct_js, item_filter_js_expr, attr_filter_expr,)
         mapred.map(js_func)
         result = mapred.run()
         if not result:

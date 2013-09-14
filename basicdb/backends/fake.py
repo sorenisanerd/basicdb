@@ -1,4 +1,3 @@
-import re
 import time
 
 import basicdb
@@ -70,41 +69,24 @@ class FakeBackend(basicdb.backends.StorageBackend):
 
     def select(self, owner, sql_expr):
         self._ensure_owner(owner)
-        parsed = sqlparser.simpleSQL.parseString(sql_expr)
-        domain_name = parsed.tables[0] # Only one table supported
+        parsed = sqlparser.parse(sql_expr)
+        domain_name = parsed.table
         desired_attributes = parsed.columns
 
-        filters = []
-        if parsed.where:
-            for clause in parsed.where[0][1:]:
-                col_name, rel, rval = clause
-                if rel == '=':
-                    filters += [lambda x:any([f == rval for f in x.get(col_name, [])])]
-                elif rel == '>':
-                    def fn(rval):
-                        return lambda x:any([f > rval for f in x.get(col_name, [])])
+        if parsed.where_expr != '':
+            f = lambda kv:parsed.where_expr.match(*kv)
+        else:
+            f = lambda _:True
 
-                    filters += [fn(rval)]
-                elif rel == '<':
-                    def fn(rval):
-                        return lambda x:any([f < rval for f in x.get(col_name, [])])
-                    filters += [fn(rval)]
-                elif rel == 'like':
-                    regex = re.compile(rval.replace('*', '\*').replace('_', '.').replace('%', '.*'))
-                    filters += [lambda x:any([regex.match(f) for f in x.get(col_name, [])])]
+        matching_items = dict(filter(f, self._get_all_items(owner, domain_name).iteritems()))
 
-        matching_items = {}
-        for item, item_attrs in self._get_all_items(owner, domain_name).iteritems():
-            if all(f(item_attrs) for f in filters):
-                matching_items[item] = item_attrs
-
-        if desired_attributes == '*':
+        if desired_attributes == ['*']:
             result = matching_items
         else:
             result = {}
 
             for item, item_attrs in matching_items.iteritems():
-                matching_attributes = dict([(attr_name, attr_values) for attr_name, attr_values in item_attrs.iteritems() if attr_name in desired_attributes.asList()])
+                matching_attributes = dict([(attr_name, attr_values) for attr_name, attr_values in item_attrs.iteritems() if attr_name in desired_attributes])
                 if matching_attributes:
                     result[item] = matching_attributes
 

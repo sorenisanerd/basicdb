@@ -23,3 +23,4 @@ The following API calls work (sufficiently to make the positive tests pass):
 
 Things BasicDB doesn't do:
  * Authentication
+ * Index data (so query performance will probably be horrible compared to SimpleDB)

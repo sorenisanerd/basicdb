@@ -3,7 +3,7 @@ cffi==0.6
 cov-core==1.7
 coverage==3.6
 distribute==0.6.34
--e git+http://github.com/sorenh/falcon.git#egg=falcon
+-e git+http://github.com/sorenh/falcon.git@master#egg=falcon-dev
 gunicorn==17.5
 httplib2==0.8
 ipython==1.0.0

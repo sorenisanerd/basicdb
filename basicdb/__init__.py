@@ -18,9 +18,6 @@ def load_backend(name):
 
 load_backend(os.environ.get('BASICDB_BACKEND_DRIVER', 'fake'))
 
-class Authentication(object):
-    pass
-
 class AllAttributes(object):
     pass
 
