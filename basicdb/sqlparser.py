@@ -1,4 +1,4 @@
-#
+# coding=utf-8
 # SQL parser based on select_parser.py from the pyparsing distribution
 #
 # Copyright © 2010, Paul McGuire
