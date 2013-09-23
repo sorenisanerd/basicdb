@@ -195,7 +195,7 @@ class BinaryComparisonOperator(BoolOperator):
         elif self.reprsymbol == 'LIKE':
             if arg0:
                 regex = re.compile(regex_from_like(arg1))
-                return regex.match(arg0)
+                return bool(regex.match(arg0))
             else:
                 return False
 
@@ -327,15 +327,16 @@ if __name__ == "__main__":
     select * from xyzzy
     """.splitlines()
     tests = """\
-    select * from xyzzy where z IN ('10', '11')
-    select foo, bar from xyzzy where z IN ('10', '11')
+    SELECT * FROM foobar WHERE colour == 'blue' and size > '5' or shape = 'triangular'
     """.splitlines()
     for t in tests:
         if t.strip() == '':
             continue
         print t
         try:
-            print parse(t).dump()
+            tree = parse(t)
+            import pdb;pdb.set_trace()
+            print t.dump()
         except ParseException, pe:
             print 'Parsing %r failed' % (t,)
             print pe.msg
