@@ -39,7 +39,7 @@ def lookup(id):
     return
 
 def regex_from_like(s):
-    return s.replace('*', '\*').replace('_', '.').replace('%', '.*')
+    return str(s).replace('*', '\*').replace('_', '.').replace('%', '.*')
 
 class BoolOperand(object):
     def __cmp__(self, other):
@@ -47,6 +47,9 @@ class BoolOperand(object):
             return cmp(self.value, other.value)
         else:
             return cmp(super(BoolOperand, self), other)
+
+    def comparable(self):
+        return True
 
 class ValueList(BoolOperand):
     def __init__(self, t):
@@ -69,9 +72,6 @@ class Literal(BoolOperand):
     def __str__(self):
         return str(self.value)
 
-    def __eq__(self, other):
-        return other == self.value
-
 class Identifier(BoolOperand):
     def __init__(self, t):
         self.reference = t[0]
@@ -82,6 +82,11 @@ class Identifier(BoolOperand):
 
     def riak_js_expr(self):
         return 'vals[%r]' % (self.reference,)
+
+    def comparable(self):
+        if self.value is None:
+            return False
+        return True
 
 class BoolOperator(object):
     def __init__(self, t):
@@ -173,9 +178,9 @@ class BinaryComparisonOperator(BoolOperator):
             raise ParseException("We don't allow comparing two identifiers nor two literals!")
 
     def __bool__(self):
-        arg0 = self.args[0].value
-        arg1 = self.args[1].value
-        if None in (arg0, arg1):
+        arg0 = self.args[0]
+        arg1 = self.args[1]
+        if not arg0.comparable() or not arg1.comparable():
             return False
 
         if self.reprsymbol == '<':
@@ -191,11 +196,11 @@ class BinaryComparisonOperator(BoolOperator):
         elif self.reprsymbol == '>=':
             return arg0 >= arg1
         elif self.reprsymbol == 'IN':
-            return arg0 in arg1
+            return arg0.value in arg1
         elif self.reprsymbol == 'LIKE':
             if arg0:
                 regex = re.compile(regex_from_like(arg1))
-                return bool(regex.match(arg0))
+                return bool(regex.match(arg0.value))
             else:
                 return False
 

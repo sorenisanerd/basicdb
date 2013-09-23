@@ -430,8 +430,19 @@ class _GenericBackendDriverTest(unittest2.TestCase):
         f("select * from mydomain where Rating = '***' or Rating = '*****'",
           ["0385333498", "B00005JPLW", "B000SF3NGK"])
 
-        f("select * from mydomain where (Year > '1950' and Year < '1960') or Year like '193%' or Year = '2007'",
+        f("select * from mydomain where (Year > '1950' and Year < '1960') "
+          "or Year like '193%' or Year = '2007'",
           ["0385333498", "0802131786", "B000T9886K", "B00005JPLW"])
+
+        f("select * from mydomain where (Year > '1950' and Year < '1960') "
+          "or Year like '193%' or Year = '2007'",
+          ["0385333498", "0802131786", "B000T9886K", "B00005JPLW"])
+
+        f("select * from mydomain where Rating = '4 stars' or Rating = '****'",
+          ["1579124585", "0802131786", "B000T9886K"])
+
+        f("select * from mydomain where Keyword = 'Book' and Keyword = 'Hardcover'",
+          [])
 
     def test_select(self):
         self.backend.create_domain("owner", "domain1")
