@@ -62,6 +62,9 @@ class ValueList(BoolOperand):
     def __contains__(self, item):
         return any(item == val.value for val in self._value)
 
+    def riak_js_expr(self):
+        return '[' + ','.join([val.riak_js_expr() for val in self._value]) + ']'
+
 class Literal(BoolOperand):
     def __init__(self, t):
         self.value = t[0]
@@ -155,6 +158,9 @@ class BinaryComparisonOperator(BoolOperator):
             arg0 = self.args[0]
             arg1 = self.args[1].value
             return '%s.match(/%s/g)' % (arg0.riak_js_expr(), regex_from_like(arg1),)
+        elif self.reprsymbol == 'IN':
+            return '%s.indexOf(%s) >= 0' % (self.args[1].riak_js_expr(),
+                                            self.args[0].riak_js_expr())
         else:
             return super(BinaryComparisonOperator, self).riak_js_expr()
 

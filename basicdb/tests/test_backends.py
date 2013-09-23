@@ -441,6 +441,9 @@ class _GenericBackendDriverTest(unittest2.TestCase):
         f("select * from mydomain where Rating = '4 stars' or Rating = '****'",
           ["1579124585", "0802131786", "B000T9886K"])
 
+        f("select * from mydomain where Rating in ('4 stars', '****')",
+          ["1579124585", "0802131786", "B000T9886K"])
+
         f("select * from mydomain where Keyword = 'Book' and Keyword = 'Hardcover'",
           [])
 
