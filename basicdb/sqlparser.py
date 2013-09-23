@@ -42,7 +42,11 @@ def regex_from_like(s):
     return s.replace('*', '\*').replace('_', '.').replace('%', '.*')
 
 class BoolOperand(object):
-    pass
+    def __cmp__(self, other):
+        if isinstance(other, BoolOperand):
+            return cmp(self.value, other.value)
+        else:
+            return cmp(super(BoolOperand, self), other)
 
 class ValueList(BoolOperand):
     def __init__(self, t):
@@ -203,6 +207,10 @@ class BetweenXAndY(BoolOperator):
     def __bool__(self):
         return self.args[0] > min(*self.args[1:]) and self.args[0] < max(*self.args[1:])
 
+    def riak_js_expr(self):
+        minval = min(*self.args[1:])
+        maxval = max(*self.args[1:])
+        return ("(%s < %s) && (%s < %s)" % (minval.riak_js_expr(), self.args[0].riak_js_expr(), self.args[0].riak_js_expr(), maxval.riak_js_expr()))
 
 class BoolNot(BoolOperand):
     def __init__(self,t):

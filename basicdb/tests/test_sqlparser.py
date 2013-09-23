@@ -88,6 +88,10 @@ class SQLParserTest(unittest2.TestCase):
         expr = sqlparser.parse("SELECT * FROM foobar WHERE a <= 'b'")
         self.assertFalse(expr.where_expr.match('item1', {'a': set(['c'])}))
 
+    def test_where_between_and(self):
+        expr = sqlparser.parse("SELECT * FROM foobar WHERE a between 'b' and 'f'")
+        self.assertTrue(expr.where_expr.match('item1', {'a': set(['d'])}))
+
     def test_where_greater_than_or_equal(self):
         expr = sqlparser.parse("SELECT * FROM foobar WHERE a >= 'b'")
         self.assertTrue(expr.where_expr.match('item1', {'a': set(['b'])}))
