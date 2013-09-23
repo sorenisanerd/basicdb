@@ -447,6 +447,10 @@ class _GenericBackendDriverTest(unittest2.TestCase):
         f("select * from mydomain where Keyword = 'Book' and Keyword = 'Hardcover'",
           [])
 
+        f("select * from mydomain where every(Keyword) in ('Book', 'Paperback')",
+          ["0385333498", "0802131786"])
+
+
     def test_select(self):
         self.backend.create_domain("owner", "domain1")
         self.backend.put_attributes("owner", "domain1", "item1",

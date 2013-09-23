@@ -38,18 +38,51 @@ ParserElement.enablePackrat()
 def lookup(id):
     return
 
+def lookup_every(id):
+    return
+
 def regex_from_like(s):
     return str(s).replace('*', '\*').replace('_', '.').replace('%', '.*')
 
 class BoolOperand(object):
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if isinstance(other, BoolOperand):
-            return cmp(self.value, other.value)
-        else:
-            return cmp(super(BoolOperand, self), other)
+            return all(cmp(v1, v2) < 0 for v1, v2 in itertools.product(self.value, other.value))
+        return NotImplemented
+
+    def __le__(self, other):
+        if isinstance(other, BoolOperand):
+            return all(cmp(v1, v2) <= 0 for v1, v2 in itertools.product(self.value, other.value))
+        return NotImplemented
+
+    def __gt__(self, other):
+        if isinstance(other, BoolOperand):
+            return all(cmp(v1, v2) > 0 for v1, v2 in itertools.product(self.value, other.value))
+        return NotImplemented
+
+    def __ge__(self, other):
+        if isinstance(other, BoolOperand):
+            return all(cmp(v1, v2) >= 0 for v1, v2 in itertools.product(self.value, other.value))
+        return NotImplemented
+
+    def __eq__(self, other):
+        if isinstance(other, BoolOperand):
+            return all(cmp(v1, v2) == 0 for v1, v2 in itertools.product(self.value, other.value))
+        return NotImplemented
+
+    def __ne__(self, other):
+        if isinstance(other, BoolOperand):
+            return all(cmp(v1, v2) != 0 for v1, v2 in itertools.product(self.value, other.value))
+        return NotImplemented
 
     def comparable(self):
         return True
+
+    def get_single_value_or_raise(self):
+        if len(self.value) > 1:
+            raise Exception("Asked for singular value, but multiple values were available")
+        else:
+            return self.value.copy().pop()
 
 class ValueList(BoolOperand):
     def __init__(self, t):
@@ -60,20 +93,23 @@ class ValueList(BoolOperand):
         return str(self._value)
 
     def __contains__(self, item):
-        return any(item == val.value for val in self._value)
+        for needle in item.value:
+            if not any(needle == v.get_single_value_or_raise() for v in self._value):
+                return False
+        return True
 
     def riak_js_expr(self):
         return '[' + ','.join([val.riak_js_expr() for val in self._value]) + ']'
 
 class Literal(BoolOperand):
     def __init__(self, t):
-        self.value = t[0]
+        self.value = set([t[0]])
 
     def riak_js_expr(self):
-        return repr(self.value)
+        return repr(self.get_single_value_or_raise())
 
     def __str__(self):
-        return str(self.value)
+        return str(self.get_single_value_or_raise())
 
 class Identifier(BoolOperand):
     def __init__(self, t):
@@ -81,15 +117,29 @@ class Identifier(BoolOperand):
 
     @property
     def value(self):
-        return lookup(self.reference)
+        val = lookup(self.reference)
+        if val is None:
+            return val
+        return set([lookup(self.reference)])
 
     def riak_js_expr(self):
-        return 'vals[%r]' % (self.reference,)
+        return '[vals[%r]]' % (self.reference,)
 
     def comparable(self):
         if self.value is None:
             return False
         return True
+
+class EveryIdentifier(Identifier):
+    def __init__(self, t):
+        self.identifier = t[1]
+
+    @property
+    def value(self):
+        return lookup_every(self.identifier.reference)
+
+    def riak_js_expr(self):
+        return 'val[%r]' % (self.identifier.reference,)
 
 class BoolOperator(object):
     def __init__(self, t):
@@ -101,8 +151,16 @@ class BoolOperator(object):
         return self.__bool__()
 
     def riak_js_expr(self):
-        sep = " %s " % self.riak_js_oper
-        return "(" + sep.join(map(lambda a:a.riak_js_expr(),self.args)) + ")"
+        ident = filter(lambda x:isinstance(x, Identifier), self.args)
+        if len(ident) > 0:
+            ident = ident[0]
+            return "((%s != undefined) && %s.filter(function l(x) { return !(%s %s %s); }).length == 0)" % (ident.riak_js_expr(), ident.riak_js_expr(),
+                                                                                                            self.args[0] is ident and 'x' or self.args[0].riak_js_expr(),
+                                                                                                            self.riak_js_oper,
+                                                                                                            self.args[1] is ident and 'x' or self.args[1].riak_js_expr())
+        else:
+           sep = " %s " % self.riak_js_oper
+           return "(" + sep.join(map(lambda a:a.riak_js_expr(),self.args)) + ")"
 
     def __str__(self):
         sep = " %s " % self.reprsymbol
@@ -112,18 +170,20 @@ class BoolOperator(object):
         def set_iter(key, vals):
             return ((key, v) for v in vals)
 
-        return any((self._match(item_name, dict(values)) for values in itertools.product(*[set_iter(key, attrs[key]) for key in attrs.keys()])))
+        return any((self._match(item_name, dict(values), attrs) for values in itertools.product(*[set_iter(key, attrs[key]) for key in attrs.keys()])))
 
-    def _match(self, item_name, attrs):
-        global lookup
+    def _match(self, item_name, attrs, raw_attrs):
+        global lookup, lookup_every
         def _lookup(key):
             return attrs.get(key, None)
-        saved_lookup = lookup
+        def _lookup_every(key):
+            return raw_attrs.get(key, None)
+        saved_lookup, saved_lookup_every = lookup, lookup_every
         try:
-            lookup = _lookup
+            lookup, lookup_every = _lookup, _lookup_every
             return self.__bool__()
         finally:
-            lookup = saved_lookup 
+            lookup, lookup_every = saved_lookup, saved_lookup_every
 
 
 class BoolAnd(BoolOperator):
@@ -156,11 +216,13 @@ class BinaryComparisonOperator(BoolOperator):
     def riak_js_expr(self):
         if self.reprsymbol == 'LIKE':
             arg0 = self.args[0]
-            arg1 = self.args[1].value
-            return '%s.match(/%s/g)' % (arg0.riak_js_expr(), regex_from_like(arg1),)
+            arg1 = self.args[1]
+            return '%s.filter(function(s) { return !s.match(/%s/g) }).length == 0' % (arg0.riak_js_expr(), regex_from_like(arg1.get_single_value_or_raise()),)
         elif self.reprsymbol == 'IN':
-            return '%s.indexOf(%s) >= 0' % (self.args[1].riak_js_expr(),
-                                            self.args[0].riak_js_expr())
+            print self.args[0]
+            return '(%s != undefined) && %s.filter(function(s) { return (%s.indexOf(s) < 0) }).length == 0' % (self.args[0].riak_js_expr(),
+                                                                                                               self.args[0].riak_js_expr(),
+                                                                                                               self.args[1].riak_js_expr())
         else:
             return super(BinaryComparisonOperator, self).riak_js_expr()
 
@@ -202,11 +264,11 @@ class BinaryComparisonOperator(BoolOperator):
         elif self.reprsymbol == '>=':
             return arg0 >= arg1
         elif self.reprsymbol == 'IN':
-            return arg0.value in arg1
+            return arg0 in arg1
         elif self.reprsymbol == 'LIKE':
             if arg0:
                 regex = re.compile(regex_from_like(arg1))
-                return bool(regex.match(arg0.value))
+                return bool(regex.match(arg0.get_single_value_or_raise()))
             else:
                 return False
 
@@ -238,9 +300,9 @@ select_stmt = Forward().setName("select statement")
 
 # keywords
 (  UNION, ALL, AND, OR, INTERSECT, INTERSECTION, EXCEPT, COLLATE, ASC, DESC, ON,
- NOT, SELECT, DISTINCT, FROM, WHERE, BY, ORDER, BY, LIMIT) = map(CaselessKeyword,
+ NOT, SELECT, DISTINCT, FROM, WHERE, BY, ORDER, BY, LIMIT, EVERY) = map(CaselessKeyword,
 """UNION, ALL, AND, OR, INTERSECT, INTERSECTION, EXCEPT, COLLATE, ASC, DESC, ON,
- NOT, SELECT, DISTINCT, FROM, WHERE, BY, ORDER, BY, LIMIT""".replace(",","").split())
+ NOT, SELECT, DISTINCT, FROM, WHERE, BY, ORDER, BY, LIMIT, EVERY""".replace(",","").split())
 
 (CAST, ISNULL, NOTNULL, NULL, IS, BETWEEN, ELSE, END, CASE, WHEN, THEN, EXISTS,
  COLLATE, IN, LIKE, GLOB, REGEXP, MATCH, ESCAPE, CURRENT_TIME, CURRENT_DATE,
@@ -249,7 +311,7 @@ select_stmt = Forward().setName("select statement")
  CURRENT_TIME, CURRENT_DATE, CURRENT_TIMESTAMP""".replace(",","").split())
 
 keyword = MatchFirst((UNION, ALL, INTERSECT, EXCEPT, COLLATE, ASC, DESC, ON,
- NOT, SELECT, DISTINCT, FROM, WHERE, BY,
+ NOT, SELECT, DISTINCT, FROM, WHERE, BY, EVERY,
  ORDER, BY, LIMIT, CAST, ISNULL, NOTNULL, NULL, IS, BETWEEN, ELSE, END, CASE, WHEN, THEN, EXISTS,
  COLLATE, IN, LIKE, GLOB, REGEXP, MATCH, ESCAPE, CURRENT_TIME, CURRENT_DATE,
  CURRENT_TIMESTAMP))
@@ -270,6 +332,7 @@ expr_term = (
     function_name + LPAR + Optional(delimitedList(expr)) + RPAR |
     literal_value.setParseAction(Literal) |
     identifier.setParseAction(Identifier) |
+    (EVERY + LPAR + identifier.setParseAction(Identifier) + RPAR).setParseAction(EveryIdentifier) |
     (LPAR + Optional(delimitedList(literal_value.setParseAction(Literal))) + RPAR).setParseAction(ValueList)
     )
 

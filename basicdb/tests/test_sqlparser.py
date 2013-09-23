@@ -92,6 +92,14 @@ class SQLParserTest(unittest2.TestCase):
         expr = sqlparser.parse("SELECT * FROM foobar WHERE a between 'b' and 'f'")
         self.assertTrue(expr.where_expr.match('item1', {'a': set(['d'])}))
 
+    def test_where_every(self):
+        expr = sqlparser.parse("SELECT * FROM foobar WHERE every(a) in ('b','c')")
+        self.assertTrue(expr.where_expr.match('item1', {'a': set(['b', 'c'])}))
+
+    def test_where_every_negative(self):
+        expr = sqlparser.parse("SELECT * FROM foobar WHERE every(a) in ('b','c')")
+        self.assertFalse(expr.where_expr.match('item1', {'a': set(['b', 'c', 'd'])}))
+
     def test_where_greater_than_or_equal(self):
         expr = sqlparser.parse("SELECT * FROM foobar WHERE a >= 'b'")
         self.assertTrue(expr.where_expr.match('item1', {'a': set(['b'])}))

@@ -237,6 +237,7 @@ class RiakBackend(basicdb.backends.StorageBackend):
                               return [[]];
                           }
                       }''' % (cartesianProduct_js, item_filter_js_expr, attr_filter_expr,)
+        print js_func
         mapred.map(js_func)
         result = mapred.run()
         if not result:
