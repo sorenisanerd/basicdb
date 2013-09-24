@@ -186,6 +186,16 @@ class BoolOperator(object):
             lookup, lookup_every = saved_lookup, saved_lookup_every
 
 
+class Intersection(BoolOperator):
+    def __init__(self, t):
+        self.args = t[0][::2]
+
+    def match(self, item_name, attrs):
+        return all(subexpr.match(item_name, attrs) for subexpr in self.args)
+
+    def riak_js_expr(self):
+        return [arg.riak_js_expr() for arg in self.args]
+
 class BoolAnd(BoolOperator):
     riak_js_oper = '&&'
     reprsymbol = '&'
@@ -350,7 +360,7 @@ expr << (operatorPrecedence(expr_term,
     ((BETWEEN,AND), TERNARY, opAssoc.LEFT, BetweenXAndY),
     (OR, BINARY, opAssoc.LEFT, BoolOr),
     (AND, BINARY, opAssoc.LEFT, BoolAnd),
-    (INTERSECTION, BINARY, opAssoc.LEFT),
+    (INTERSECTION, BINARY, opAssoc.LEFT, Intersection),
     ])).setParseAction(dont_allow_non_comparing_terms)
 
 ordering_term = expr + Optional(ASC | DESC)

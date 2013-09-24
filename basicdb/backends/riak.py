@@ -68,7 +68,7 @@ cartesianProduct_js = '''
     }
   }'''
         
-iterate_over_attrs_js = '''
+construct_intermediate_arrays = '''
     m1 = new Array();
     for (k in val) {
         m2 = new Array();
@@ -77,14 +77,20 @@ iterate_over_attrs_js = '''
         }
         m1.push(m2);
     }
-    var xp = crossProduct(m1);
-    while (xp.next()) { 
-       args = xp.args;
-       vals = Object();
-       for (kv in args) {
-           vals[args[kv][0]] = args[kv][1];
-       }
-       XXXX
+    '''
+
+iterate_over_attrs_js = '''
+    if (matched) {
+      matched = false;
+      var xp = crossProduct(m1);
+      while (xp.next()) { 
+         args = xp.args;
+         vals = Object();
+         for (kv in args) {
+             vals[args[kv][0]] = args[kv][1];
+         }
+         XXXX
+      }
     }
 '''
  
@@ -201,11 +207,13 @@ class RiakBackend(basicdb.backends.StorageBackend):
 
         mapred.add_bucket(self._domain_bucket_name(owner, domain_name))
 
-        if parsed.where_expr == '':
-            item_filter_js_expr = 'matched = true;'
-        else:
-            item_filter_js_expr = iterate_over_attrs_js.replace('XXXX', 'if (%s) { matched=true; break; }' % (parsed.where_expr.riak_js_expr()))
-
+        item_filter_js_expr = construct_intermediate_arrays
+        if parsed.where_expr != '':
+            exprs =  parsed.where_expr.riak_js_expr()
+            if not isinstance(exprs, list):
+                exprs = [exprs]
+            for expr in exprs:
+                item_filter_js_expr += iterate_over_attrs_js.replace('XXXX', 'if (%s) { matched=true; break; }' % (expr))
 
         if desired_attributes == ['*']:
             attr_filter_expr = 'true'
@@ -215,7 +223,7 @@ class RiakBackend(basicdb.backends.StorageBackend):
         js_func = '''function(riakObject) {
                           var retval = {};
                           var val = JSON.parse(riakObject.values[0].data);
-                          var matched = false;
+                          var matched = true;
                           var nonempty = false;
 
                           %s
@@ -237,7 +245,6 @@ class RiakBackend(basicdb.backends.StorageBackend):
                               return [[]];
                           }
                       }''' % (cartesianProduct_js, item_filter_js_expr, attr_filter_expr,)
-        print js_func
         mapred.map(js_func)
         result = mapred.run()
         if not result:

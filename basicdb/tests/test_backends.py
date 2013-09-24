@@ -450,6 +450,8 @@ class _GenericBackendDriverTest(unittest2.TestCase):
         f("select * from mydomain where every(Keyword) in ('Book', 'Paperback')",
           ["0385333498", "0802131786"])
 
+        f("select * from mydomain where Keyword = 'Book' intersection Keyword = 'Hardcover'",
+          ["1579124585"])
 
     def test_select(self):
         self.backend.create_domain("owner", "domain1")
@@ -484,7 +486,7 @@ class _GenericBackendDriverTest(unittest2.TestCase):
         self.backend.create_domain("owner", "domain1")
         self.backend.put_attributes("owner", "domain1", "item1",
                                     {"shape": set(["square", "triangle"])}, {})
-        
+
         self.assertFalse(self.backend.check_expectations("owner", "domain1", "item1", [("shape", False)]))
         self.assertFalse(self.backend.check_expectations("owner", "domain1", "item1", [("colour", True)]))
         self.assertTrue(self.backend.check_expectations("owner", "domain1", "item1", [("colour", False)]))
