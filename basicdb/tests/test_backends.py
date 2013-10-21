@@ -405,9 +405,14 @@ class _GenericBackendDriverTest(unittest2.TestCase):
 
     def test_select2(self):
         self._load_sample_query_data_set()
-        def f(expr, items):
-            self.assertEquals(set(self.backend.select("owner", expr).keys()),
-                              set(items))
+        def f(expr, items, ordered=False):
+            if not ordered:
+                wrap = set
+            else:
+                wrap = list
+
+            self.assertEquals(wrap(self.backend.select_wrapper("owner", expr)[0]),
+                              wrap(items))
 
         f("select * from mydomain where Title = 'The Right Stuff'",
           ["1579124585"])
@@ -453,6 +458,12 @@ class _GenericBackendDriverTest(unittest2.TestCase):
         f("select * from mydomain where Keyword = 'Book' intersection Keyword = 'Hardcover'",
           ["1579124585"])
 
+        f("select * from mydomain where Year < '1980' order by Year asc",
+          ["0802131786", "0385333498", "1579124585"], ordered=True)
+
+        f("select * from mydomain where Year < '1980' order by Year desc",
+          ["1579124585", "0385333498", "0802131786"], ordered=True)
+
     def test_select(self):
         self.backend.create_domain("owner", "domain1")
         self.backend.put_attributes("owner", "domain1", "item1",
@@ -464,21 +475,21 @@ class _GenericBackendDriverTest(unittest2.TestCase):
                                     {"shape": set(["round"]),
                                      "colour": set(["Red"])}, {})
 
-        self.assertEquals(self.backend.select("owner", "SELECT * FROM domain1"),
+        self.assertEquals(self.backend.select_wrapper("owner", "SELECT * FROM domain1")[1],
                           {"item1": {"shape": set(["square", "triangle"]),
                                      "colour": set(["Blue"])},
                            "item2": {"colour": set(["Blue"])},
                            "item3": {"shape": set(["round"]),
                                      "colour": set(["Red"])}})
 
-        self.assertEquals(self.backend.select("owner", "SELECT shape FROM domain1"),
+        self.assertEquals(self.backend.select_wrapper("owner", "SELECT shape FROM domain1")[1],
                           {"item1": {"shape": set(["square", "triangle"])},
                            "item3": {"shape": set(["round"])}})
 
-        self.assertEquals(self.backend.select("owner", "SELECT shape FROM domain1 WHERE colour LIKE 'Blue'"),
+        self.assertEquals(self.backend.select_wrapper("owner", "SELECT shape FROM domain1 WHERE colour LIKE 'Blue'")[1],
                           {"item1": {"shape": set(["square", "triangle"])}})
 
-        self.assertEquals(self.backend.select("owner", "SELECT shape FROM domain1 WHERE shape = 'triangle'"),
+        self.assertEquals(self.backend.select_wrapper("owner", "SELECT shape FROM domain1 WHERE shape = 'triangle'")[1],
                           {"item1": {"shape": set(["square", "triangle"])}})
 
 

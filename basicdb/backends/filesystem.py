@@ -8,7 +8,6 @@ import time
 
 import basicdb
 import basicdb.backends
-import basicdb.sqlparser as sqlparser
 
 class FileSystemBackend(basicdb.backends.StorageBackend):
     _domains = {}
@@ -123,8 +122,7 @@ class FileSystemBackend(basicdb.backends.StorageBackend):
             retval[item_name] = self.get_attributes(owner, domain_name, item_name)
         return retval
 
-    def select(self, owner, sql_expr):
-        parsed = sqlparser.parse(sql_expr)
+    def select(self, owner, parsed):
         domain_name = parsed.table
         desired_attributes = parsed.columns
 

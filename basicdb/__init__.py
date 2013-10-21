@@ -108,16 +108,16 @@ class DomainResource(object):
 
         elif action == "Select":
             sql_expr = urllib.unquote(req.get_param('SelectExpression'))
-            results = backend.select(owner, sql_expr)
+            order, results = backend.select_wrapper(owner, sql_expr)
 
             resp.status = falcon.HTTP_200
             dom = etree.Element("SelectResponse")
             result = etree.SubElement(dom, "SelectResult")
 
-            for item_name, item_attrs in results.iteritems():
+            for item_name in order:
                 item_elem = etree.SubElement(result, "Item")
                 etree.SubElement(item_elem, "Name").text = item_name
-                for attr_name, attr_values in item_attrs.iteritems():
+                for attr_name, attr_values in results[item_name].iteritems():
                     for attr_value in attr_values:
                         attr_elem = etree.SubElement(item_elem, "Attribute")
                         etree.SubElement(attr_elem, "Name").text = attr_name

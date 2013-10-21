@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import riak
+import riak.mapreduce
 import riak.resolver
 
 import time
@@ -7,7 +8,6 @@ import uuid
 
 import basicdb
 import basicdb.backends
-import basicdb.sqlparser as sqlparser
 
 """
 Data model:
@@ -197,14 +197,11 @@ class RiakBackend(basicdb.backends.StorageBackend):
             pass
         return {}
 
-    def select(self, owner, sql_expr):
-        import riak.mapreduce
-        mapred = riak.mapreduce.RiakMapReduce(self.riak)
-
-        parsed = sqlparser.parse(sql_expr)
+    def select(self, owner, parsed):
         domain_name = parsed.table
         desired_attributes = parsed.columns
 
+        mapred = riak.mapreduce.RiakMapReduce(self.riak)
         mapred.add_bucket(self._domain_bucket_name(owner, domain_name))
 
         item_filter_js_expr = construct_intermediate_arrays

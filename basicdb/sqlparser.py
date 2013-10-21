@@ -363,7 +363,7 @@ expr << (operatorPrecedence(expr_term,
     (INTERSECTION, BINARY, opAssoc.LEFT, Intersection),
     ])).setParseAction(dont_allow_non_comparing_terms)
 
-ordering_term = expr + Optional(ASC | DESC)
+ordering_term = identifier + Optional(ASC | DESC)
 
 single_source = table_name("table")
 

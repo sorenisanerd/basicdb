@@ -1,5 +1,6 @@
 import basicdb
 import basicdb.exceptions
+import basicdb.sqlparser as sqlparser
 
 class StorageBackend(object):
     def create_domain(self, owner, domain_name):
@@ -118,6 +119,26 @@ class StorageBackend(object):
 
     def get_attributes(self, owner, domain_name, item_name):
         raise NotImplementedError()
+
+    def select_wrapper(self, owner, sql_expr):
+        parsed = sqlparser.parse(sql_expr)
+        raw_results = self.select(owner, parsed)
+        if parsed.order_by_terms:
+            order = []
+            for item_name, item_attrs in raw_results.iteritems():
+                for val in item_attrs[parsed.order_by_terms[0].reference]:
+                    order.append((val, item_name))
+            order.sort(key=lambda x:x[0], reverse=parsed.order_by_terms[1] == "DESC")
+            order = map(lambda x:x[1], order)
+            self.prev = None
+            def remove_if_same_as_previous(x):
+                retval = x != self.prev
+                self.prev = x
+                return retval
+            order = filter(remove_if_same_as_previous, order)
+        else:
+            order = raw_results.keys()
+        return order, raw_results
 
     def select(self, owner, sql_expr):
         raise NotImplementedError()

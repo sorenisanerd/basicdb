@@ -2,7 +2,6 @@ import time
 
 import basicdb
 import basicdb.backends
-import basicdb.sqlparser as sqlparser
 
 class FakeBackend(basicdb.backends.StorageBackend):
     _users = {}
@@ -67,9 +66,8 @@ class FakeBackend(basicdb.backends.StorageBackend):
         self._ensure_owner(owner)
         return self._users[owner][domain_name]
 
-    def select(self, owner, sql_expr):
+    def select(self, owner, parsed):
         self._ensure_owner(owner)
-        parsed = sqlparser.parse(sql_expr)
         domain_name = parsed.table
         desired_attributes = parsed.columns
 
