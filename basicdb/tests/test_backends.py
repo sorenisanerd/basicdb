@@ -1,8 +1,8 @@
-import unittest2
+import testtools as unittest
 
 import basicdb.backends
 
-class BaseStorageBackendTests(unittest2.TestCase):
+class BaseStorageBackendTests(unittest.TestCase):
     def test_create_domain_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.create_domain, "owner", "domain-name")
@@ -246,7 +246,7 @@ class BaseStorageBackendTests(unittest2.TestCase):
         self.assertIn(("owner", "domain", "item", ("attr2", "val3")), self.check_expectation_call_args)
 
 
-class _GenericBackendDriverTest(unittest2.TestCase):
+class _GenericBackendDriverTest(object):
     def test_create_list_delete_domain(self):
         self.assertEquals(self.backend.list_domains("owner"), [])
 
@@ -520,26 +520,34 @@ class _GenericBackendDriverTest(unittest2.TestCase):
         self.backend.create_domain("owner", "domain1")
         self.assertFalse(self.backend.check_expectations("owner", "domain1", "item1", [("foo", "bar")]))
 
-class FakeBackendDriverTest(_GenericBackendDriverTest):
+
+class FakeBackendDriverTest(_GenericBackendDriverTest, unittest.TestCase):
     def setUp(self):
+        super(FakeBackendDriverTest, self).setUp()
         import basicdb.backends.fake
         self.backend = basicdb.backends.fake.driver
 
     def tearDown(self):
+        super(FakeBackendDriverTest, self).tearDown()
         self.backend._reset()
 
-class FilesystemBackendDriverTest(_GenericBackendDriverTest):
+class FilesystemBackendDriverTest(_GenericBackendDriverTest, unittest.TestCase):
     def setUp(self):
+        super(FilesystemBackendDriverTest, self).setUp()
         import basicdb.backends.filesystem
         self.backend = basicdb.backends.filesystem.driver
 
     def tearDown(self):
+        super(FilesystemBackendDriverTest, self).tearDown()
         self.backend._reset()
 
-class RiakBackendDriverTest(_GenericBackendDriverTest):
+class RiakBackendDriverTest(_GenericBackendDriverTest, unittest.TestCase):
     def setUp(self):
+        super(RiakBackendDriverTest, self).setUp()
         import basicdb.backends.riak
-        self.backend = basicdb.backends.riak.driver
+        import uuid
+        self.backend = basicdb.backends.riak.RiakBackend(base_bucket='testbucket%s' % (uuid.uuid4().hex,))
 
     def tearDown(self):
+        super(RiakBackendDriverTest, self).tearDown()
         self.backend._reset()

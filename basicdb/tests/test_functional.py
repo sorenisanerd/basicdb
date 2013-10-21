@@ -5,7 +5,7 @@ import errno
 import os
 from multiprocessing import Process, Event
 import signal
-import unittest2
+import testtools as unittest
 
 import basicdb
 
@@ -18,9 +18,10 @@ def run_server(port, server_ready, done):
         def stop_cov(*args):
             cov.stop()
             cov.save()
+            raise SystemExit('killed')
     else:
         def stop_cov(*args):
-            pass
+            raise SystemExit('killed')
 
     fp = open('/tmp/null', 'a+')
     os.dup2(fp.fileno(), 0)
@@ -35,8 +36,9 @@ def run_server(port, server_ready, done):
     server_ready.set()
     s.serve_forever()
 
-class FunctionalTests(unittest2.TestCase):
+class FunctionalTests(object):
     def setUp(self):
+        super(FunctionalTests, self).setUp()
         existing_server = os.environ.get('BASICDB_PORT', False)
         if not existing_server:
             def kill_server():
@@ -65,6 +67,7 @@ class FunctionalTests(unittest2.TestCase):
         self.kill_server = kill_server
 
     def tearDown(self):
+        super(FunctionalTests, self).tearDown()
         self.kill_server()
 
 class _BotoTests(FunctionalTests):
@@ -77,7 +80,7 @@ class _BotoTests(FunctionalTests):
                                      region=local_region,
                                      is_secure=False, port=self.port)
 
-    def test_create_list_delete_domains(self):
+    def _test_create_list_delete_domains(self):
         self.conn.create_domain('test-domain')
         self.conn.create_domain('test-domain-2')
         domains = self.conn.get_all_domains()
@@ -263,23 +266,26 @@ class _BotoTests(FunctionalTests):
             print row
 
 
-class FakeBackedBotoTests(_BotoTests):
+class FakeBackedBotoTests(_BotoTests, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        super(FakeBackedBotoTests, cls).setUpClass()
         basicdb.load_backend('fake')
 
 
 class _FilesystemBackedBotoTests(_BotoTests):
     @classmethod
     def setUpClass(cls):
+        super(_FilesystemBackedBotoTests, cls).setUpClass()
         basicdb.load_backend('filesystem')
 
 
 class _RiakBackedBotoTests(_BotoTests):
     @classmethod
     def setUpClass(cls):
+        super(_RiakBackedBotoTests, cls).setUpClass()
         basicdb.load_backend('riak')
 
 
 if __name__ == "__main__":
-    unittest2.main()
+    unittest.main()

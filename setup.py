@@ -27,11 +27,4 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     license='Apache 2.0',
-    keywords='basicdb simpledb',
-    install_requires=[
-        'falcon',
-    ],
-    test_requires=[
-        'boto',
-    ],
-    test_suite='nose.collector')
+    keywords='basicdb simpledb')

@@ -1,8 +1,8 @@
-import unittest2
+import testtools as unittest
 
 from basicdb import sqlparser, exceptions
 
-class SQLParserTest(unittest2.TestCase):
+class SQLParserTest(unittest.TestCase):
     def test_simple_select_asterisk(self):
         expr = sqlparser.parse("SELECT * FROM foobar")
         self.assertEquals(expr.columns[0], "*")

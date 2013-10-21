@@ -1,0 +1,9 @@
+boto
+coverage
+discover
+mock
+pep8
+testrepository
+testtools
+unittest2
+wsgiref==0.1.2

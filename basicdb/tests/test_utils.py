@@ -1,9 +1,9 @@
-import unittest2
+import testtools as unittest
 
 import basicdb
 from basicdb import utils
 
-class UtilsTests(unittest2.TestCase):
+class UtilsTests(unittest.TestCase):
     def _create_request(self, params):
         class Request(object):
             def __init__(self, params):
@@ -31,7 +31,7 @@ class UtilsTests(unittest2.TestCase):
                                  '6': {'Name': 'attr6'},
                                  '7': {'Value': 'attr7val1',
                                        'Replace': 'attr7replace'}})
-      
+
     def test_extract_batch_deletions_from_query_params(self):
         request = self._create_request({'Item.1.ItemName': 'item1',
                                         'Item.1.Attribute.1.Name': 'attr1',

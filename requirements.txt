@@ -1,0 +1,4 @@
+distribute
+-e git+http://github.com/sorenh/falcon.git@master#egg=falcon-dev
+-e git+https://github.com/basho/riak-python-client.git@6d4af99b2c14cc4a82aaacdcc3480262a2f9cb55#egg=riak-dev
+pyparsing
