@@ -6,11 +6,11 @@ class BaseStorageBackendTests(unittest2.TestCase):
     def test_create_domain_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.create_domain, "owner", "domain-name")
-        
+
     def test_delete_domain_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.delete_domain, "owner", "domain-name")
-        
+
     def test_domain_metadata_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.domain_metadata, "owner", "domain-name")
@@ -18,19 +18,19 @@ class BaseStorageBackendTests(unittest2.TestCase):
     def test_list_domains_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.list_domains, "owner")
-        
+
     def test_add_attribute_value_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.add_attribute_value, "owner", "domain", "item", "attrname", "attrvalue")
-        
+
     def test_delete_attribute_all_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.delete_attribute_all, "owner", "domain", "item", "attrname")
-        
+
     def test_delete_attribute_value_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.delete_attribute_value, "owner", "domain", "item", "attrname", "attrvalue")
-        
+
     def test_put_attributes_raises_exception_if_expectations_are_not_met(self):
         self.check_expectations_call_args = []
         self.add_attributes_call_args = []
@@ -39,7 +39,7 @@ class BaseStorageBackendTests(unittest2.TestCase):
         class TestStoreBackend(basicdb.backends.StorageBackend):
             def check_expectations(self2, *args):
                 False
-                
+
         backend = TestStoreBackend()
         self.assertRaises(basicdb.exceptions.ConditionalCheckFailed,
                           backend.put_attributes, "owner", "domain", "item",
@@ -66,13 +66,13 @@ class BaseStorageBackendTests(unittest2.TestCase):
                 self.assertTrue(self.check_expectations_call_args,
                                 "check_expectations was not called before replacing attributes")
                 self.replace_attributes_call_args += [args]
-                
+
         backend = TestStoreBackend()
         backend.put_attributes("owner", "domain", "item",
                                {"attr1": set(["attr1val1", "attr1val2"])},
                                {"attr2": set(["attr2val1"])},
                                [("attr3", True)])
-        self.assertIn(("owner", "domain", "item", [("attr3", True)]), 
+        self.assertIn(("owner", "domain", "item", [("attr3", True)]),
                       self.check_expectations_call_args)
         self.assertIn(("owner", "domain", "item", {"attr1": set(["attr1val1", "attr1val2"])}),
                       self.add_attributes_call_args)
@@ -90,9 +90,9 @@ class BaseStorageBackendTests(unittest2.TestCase):
                                      {"item1": {"attr1": set(["attr1val1", "attr1val2"])}},
                                      {"item2": {"attr2": set(["attr2val1"])}})
 
-        self.assertIn(("owner", "domain", "item1", {"attr1": set(["attr1val1", "attr1val2"])}, {}), 
+        self.assertIn(("owner", "domain", "item1", {"attr1": set(["attr1val1", "attr1val2"])}, {}),
                       self.put_attributes_call_args)
-        self.assertIn(("owner", "domain", "item2", {}, {"attr2": set(["attr2val1"])}), 
+        self.assertIn(("owner", "domain", "item2", {}, {"attr2": set(["attr2val1"])}),
                       self.put_attributes_call_args)
 
     def test_batch_delete_attributes(self):
@@ -106,22 +106,22 @@ class BaseStorageBackendTests(unittest2.TestCase):
                                         {"item1": {"attr1": set(["attr1val1", "attr1val2"])},
                                         "item2": {"attr2": set(["attr2val1"])}})
 
-        self.assertIn(("owner", "domain", "item1", {"attr1": set(["attr1val1", "attr1val2"])}), 
+        self.assertIn(("owner", "domain", "item1", {"attr1": set(["attr1val1", "attr1val2"])}),
                       self.delete_attributes_call_args)
-        self.assertIn(("owner", "domain", "item2", {"attr2": set(["attr2val1"])}), 
+        self.assertIn(("owner", "domain", "item2", {"attr2": set(["attr2val1"])}),
                       self.delete_attributes_call_args)
-                
+
     def test_get_attributes_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.get_attributes, "owner", "domain", "item")
-        
+
     def test_add_attributes(self):
         self.add_attribute_call_args = []
 
         class TestStoreBackend(basicdb.backends.StorageBackend):
             def add_attribute(self2, *args):
                 self.add_attribute_call_args += [args]
-                
+
         backend = TestStoreBackend()
         backend.add_attributes("owner", "domain", "item", {"attr1": set(["attr1val1", "attr1val2"]),
                                                       "attr2": set(["attr2val1"])})
@@ -131,29 +131,29 @@ class BaseStorageBackendTests(unittest2.TestCase):
                       self.add_attribute_call_args)
         self.assertIn(("owner", "domain", "item", "attr2", set(["attr2val1"])),
                       self.add_attribute_call_args)
-        
+
     def test_add_attribute(self):
         self.add_attribute_value_call_args = []
 
         class TestStoreBackend(basicdb.backends.StorageBackend):
             def add_attribute_value(self2, *args):
                 self.add_attribute_value_call_args += [args]
-                
+
         backend = TestStoreBackend()
         backend.add_attribute("owner", "domain", "item", "attr1", set(["attr1val1", "attr1val2"]))
         self.assertIn(("owner", "domain", "item", "attr1", "attr1val1"),
                       self.add_attribute_value_call_args)
         self.assertIn(("owner", "domain", "item", "attr1", "attr1val2"),
                       self.add_attribute_value_call_args)
-        
-        
+
+
     def test_replace_attributes(self):
         self.replace_attribute_call_args = []
 
         class TestStoreBackend(basicdb.backends.StorageBackend):
             def replace_attribute(self2, *args):
                 self.replace_attribute_call_args += [args]
-                
+
         backend = TestStoreBackend()
         backend.replace_attributes("owner", "domain", "item", {"attr1": set(["attr1val1", "attr1val2"]),
                                                                "attr2": set(["attr2val1"])})
@@ -171,12 +171,12 @@ class BaseStorageBackendTests(unittest2.TestCase):
         class TestStoreBackend(basicdb.backends.StorageBackend):
             def delete_attributes(self2, *args):
                 self.delete_attributes_call_args += [args]
-                
+
             def add_attribute(self2, *args):
                 self.assertIsNot(self.delete_attributes_call_args, None,
                                  "Attribute wasn't deleted first")
                 self.add_attribute_call_args += [args]
-                
+
         backend = TestStoreBackend()
         backend.replace_attribute("owner", "domain", "item", "attr1", set(["attr1val1", "attr1val2"]))
 
@@ -190,7 +190,7 @@ class BaseStorageBackendTests(unittest2.TestCase):
         class TestStoreBackend(basicdb.backends.StorageBackend):
             def delete_attribute(self2, *args):
                 self.delete_attribute_call_args += [args]
-                
+
         backend = TestStoreBackend()
         backend.delete_attributes("owner", "domain", "item", {"attr1": set(["attr1val1", "attr1val2"])})
 
@@ -202,10 +202,10 @@ class BaseStorageBackendTests(unittest2.TestCase):
         class TestStoreBackend(basicdb.backends.StorageBackend):
             def delete_attribute_all(self2, *args):
                 self.delete_attribute_all_call_args += [args]
-                
+
             def delete_attribute_value(self2, *args):
                 self.fail("Should not have called delete_attribute_value")
-                
+
         backend = TestStoreBackend()
         backend.delete_attribute("owner", "domain", "item", "attr1", set(["attr1val1", basicdb.AllAttributes, "attr1val2"]))
         self.assertEquals([("owner", "domain", "item", "attr1")], self.delete_attribute_all_call_args)
@@ -215,10 +215,10 @@ class BaseStorageBackendTests(unittest2.TestCase):
         class TestStoreBackend(basicdb.backends.StorageBackend):
             def delete_attribute_all(self2, *args):
                 self.fail("Should not have called delete_attribute_all")
-                
+
             def delete_attribute_value(self2, *args):
                 self.delete_attribute_value_call_args += [args]
-                
+
         backend = TestStoreBackend()
         backend.delete_attribute("owner", "domain", "item", "attr1", set(["attr1val1", "attr1val2"]))
         self.assertIn(("owner", "domain", "item", "attr1", "attr1val1"), self.delete_attribute_value_call_args)
@@ -227,7 +227,7 @@ class BaseStorageBackendTests(unittest2.TestCase):
     def test_select_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError, backend.select, "owner", "SELECT somethign FROM somewhere")
-        
+
     def test_check_expectation_raises_not_implemented(self):
         backend = basicdb.backends.StorageBackend()
         self.assertRaises(NotImplementedError,
@@ -238,14 +238,14 @@ class BaseStorageBackendTests(unittest2.TestCase):
         class TestStoreBackend(basicdb.backends.StorageBackend):
             def check_expectation(self2, *args):
                 self.check_expectation_call_args += [args]
-                
+
         backend = TestStoreBackend()
         backend.check_expectations("owner", "domain", "item", [("attr1", "val1"), ("attr1", "val2"), ("attr2", "val3")])
         self.assertIn(("owner", "domain", "item", ("attr1", "val1")), self.check_expectation_call_args)
         self.assertIn(("owner", "domain", "item", ("attr1", "val2")), self.check_expectation_call_args)
         self.assertIn(("owner", "domain", "item", ("attr2", "val3")), self.check_expectation_call_args)
 
-        
+
 class _GenericBackendDriverTest(unittest2.TestCase):
     def test_create_list_delete_domain(self):
         self.assertEquals(self.backend.list_domains("owner"), [])
@@ -258,10 +258,10 @@ class _GenericBackendDriverTest(unittest2.TestCase):
 
         self.backend.delete_domain("owner", "domain1")
         self.assertEquals(set(self.backend.list_domains("owner")), set(["domain2"]))
-        
+
         self.backend.delete_domain("owner", "domain2")
         self.assertEquals(self.backend.list_domains("owner"), [])
-        
+
     def test_domain_metadata(self):
         self.backend.create_domain("owner", "domain1")
         self.backend.domain_metadata("owner", "domain1")
@@ -277,7 +277,7 @@ class _GenericBackendDriverTest(unittest2.TestCase):
                           {"a": set(["b", "c"])})
         self.assertEquals(self.backend.get_attributes("owner", "domain1", "item2"),
                           {"d": set(["e", "f"])})
-                          
+
         self.backend.batch_put_attributes("owner", "domain1",
                                           {"item1": {"a": set(["e"])}},
                                           {"item2": {"d": set(["a", "b"])}})
@@ -286,7 +286,7 @@ class _GenericBackendDriverTest(unittest2.TestCase):
                           {"a": set(["b", "c", "e"])})
         self.assertEquals(self.backend.get_attributes("owner", "domain1", "item2"),
                           {"d": set(["a", "b"])})
-                          
+
     def test_put_get_attributes(self):
         self.backend.create_domain("owner", "domain1")
         self.backend.put_attributes("owner", "domain1", "item1",
@@ -344,7 +344,7 @@ class _GenericBackendDriverTest(unittest2.TestCase):
                                      {})
 
         self.backend.batch_delete_attributes("owner", "domain1",
-                                             {"item1": 
+                                             {"item1":
                                                {"a": set([basicdb.AllAttributes]),
                                                 "d": set(["f"]),
                                                 "f": set(["g"])},
