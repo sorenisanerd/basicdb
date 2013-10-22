@@ -27,7 +27,7 @@ import itertools
 import re
 
 from pyparsing import ParserElement, Forward, Suppress, CaselessKeyword, MatchFirst, \
-                      alphas, alphanums, Regex, QuotedString, oneOf, \
+                      alphas, alphanums, Regex, QuotedString, oneOf, Keyword, \
                       Word, Optional, delimitedList, operatorPrecedence, opAssoc, \
                       Group, ParseException
 
@@ -84,6 +84,21 @@ class BoolOperand(object):
         else:
             return self.value.copy().pop()
 
+class OrderByTerms(object):
+    def __init__(self, t):
+        # t[:2] = ['ORDER', 'BY']
+        t = t[:]
+        if len(t) <= 2:
+            self.key = None
+        else:
+            terms = t[2][:]
+            self.key = terms[0].reference
+            if len(terms) > 1 and terms[1] == 'DESC':
+                self.reverse = True
+            else:
+                self.reverse = False
+
+
 class ValueList(BoolOperand):
     def __init__(self, t):
         self.value = self
@@ -101,6 +116,16 @@ class ValueList(BoolOperand):
     def riak_js_expr(self):
         return '[' + ','.join([val.riak_js_expr() for val in self._value]) + ']'
 
+    def identifiers(self):
+        return []
+
+class Null(BoolOperand):
+    def identifiers(self):
+        return []
+
+    def riak_js_expr(self):
+        return 'undefined'
+
 class Literal(BoolOperand):
     def __init__(self, t):
         self.value = set([t[0]])
@@ -110,6 +135,9 @@ class Literal(BoolOperand):
 
     def __str__(self):
         return str(self.get_single_value_or_raise())
+
+    def identifiers(self):
+        return []
 
 class Identifier(BoolOperand):
     def __init__(self, t):
@@ -130,16 +158,25 @@ class Identifier(BoolOperand):
             return False
         return True
 
+    def identifiers(self):
+        return [self.reference]
+
+class ItemName(Identifier):
+    def riak_js_expr(self):
+        return '[riakObject.key]'
+
+
+
 class EveryIdentifier(Identifier):
     def __init__(self, t):
-        self.identifier = t[1]
+        self.reference = t[1].reference
 
     @property
     def value(self):
-        return lookup_every(self.identifier.reference)
+        return lookup_every(self.reference)
 
     def riak_js_expr(self):
-        return 'val[%r]' % (self.identifier.reference,)
+        return 'val[%r]' % (self.reference,)
 
 class BoolOperator(object):
     def __init__(self, t):
@@ -175,6 +212,8 @@ class BoolOperator(object):
     def _match(self, item_name, attrs, raw_attrs):
         global lookup, lookup_every
         def _lookup(key):
+            if key == 'itemName()':
+                return item_name
             return attrs.get(key, None)
         def _lookup_every(key):
             return raw_attrs.get(key, None)
@@ -185,8 +224,12 @@ class BoolOperator(object):
         finally:
             lookup, lookup_every = saved_lookup, saved_lookup_every
 
+    def identifiers(self):
+        return sum([arg.identifiers() for arg in self.args], [])
 
 class Intersection(BoolOperator):
+    reprsymbol = 'INTERSECTION'
+
     def __init__(self, t):
         self.args = t[0][::2]
 
@@ -229,10 +272,12 @@ class BinaryComparisonOperator(BoolOperator):
             arg1 = self.args[1]
             return '%s.filter(function(s) { return !s.match(/%s/g) }).length == 0' % (arg0.riak_js_expr(), regex_from_like(arg1.get_single_value_or_raise()),)
         elif self.reprsymbol == 'IN':
-            print self.args[0]
             return '(%s != undefined) && %s.filter(function(s) { return (%s.indexOf(s) < 0) }).length == 0' % (self.args[0].riak_js_expr(),
                                                                                                                self.args[0].riak_js_expr(),
                                                                                                                self.args[1].riak_js_expr())
+        elif len(self.reprsymbol) == 2 and self.reprsymbol[0] == 'IS' and self.reprsymbol[1] == 'NOT':
+            if isinstance(self.args[1], Null):
+                return '%s != undefined' % (self.args[0].riak_js_expr(),)
         else:
             return super(BinaryComparisonOperator, self).riak_js_expr()
 
@@ -244,6 +289,8 @@ class BinaryComparisonOperator(BoolOperator):
             return '=='
         elif self.reprsymbol in ('!=', '<>'):
             return '!='
+        elif self.reprsymbol == 'IS':
+            return 'is'
         elif self.reprsymbol == 'IN':
             raise "Oh, shit"
         elif self.reprsymbol == 'LIKE':
@@ -275,6 +322,9 @@ class BinaryComparisonOperator(BoolOperator):
             return arg0 >= arg1
         elif self.reprsymbol == 'IN':
             return arg0 in arg1
+        elif len(self.reprsymbol) == 2 and self.reprsymbol[0] == 'IS' and self.reprsymbol[1] == 'NOT':
+            if isinstance(arg1, Null):
+                return arg0.value is not None
         elif self.reprsymbol == 'LIKE':
             if arg0:
                 regex = re.compile(regex_from_like(arg1))
@@ -295,15 +345,21 @@ class BetweenXAndY(BoolOperator):
         maxval = max(*self.args[1:])
         return ("(%s < %s) && (%s < %s)" % (minval.riak_js_expr(), self.args[0].riak_js_expr(), self.args[0].riak_js_expr(), maxval.riak_js_expr()))
 
-class BoolNot(BoolOperand):
+class BoolNot(BoolOperator):
     def __init__(self,t):
-        self.arg = t[0][1]
+        self.args = t[0][1:]
+
+    def riak_js_expr(self):
+        return '!(%s)' % (self.args[0].riak_js_expr())
 
     def __str__(self):
-        return "~" + str(self.arg)
+        return "~" + str(self.args[0])
 
     def __bool__(self):
-        return not bool(self.arg)
+        return not bool(self.args[0])
+
+    def comparable(self):
+        return True
 
 LPAR,RPAR,COMMA = map(Suppress,"(),")
 select_stmt = Forward().setName("select statement")
@@ -326,8 +382,9 @@ keyword = MatchFirst((UNION, ALL, INTERSECT, EXCEPT, COLLATE, ASC, DESC, ON,
  COLLATE, IN, LIKE, GLOB, REGEXP, MATCH, ESCAPE, CURRENT_TIME, CURRENT_DATE,
  CURRENT_TIMESTAMP))
 
+itemName = MatchFirst(Keyword("itemName()")).setParseAction(ItemName)
 identifier = ((~keyword + Word(alphas, alphanums+"_")) | QuotedString("`"))
-column_name = identifier.copy()
+column_name = (itemName | identifier.copy())
 table_name = identifier.copy()
 function_name = identifier.copy()
 
@@ -336,11 +393,14 @@ expr = Forward().setName("expression")
 
 integer = Regex(r"[+-]?\d+")
 string_literal = QuotedString("'")
-literal_value = ( string_literal | NULL | CURRENT_TIME | CURRENT_DATE | CURRENT_TIMESTAMP )
+literal_value = string_literal
+
 
 expr_term = (
+    itemName |
     function_name + LPAR + Optional(delimitedList(expr)) + RPAR |
     literal_value.setParseAction(Literal) |
+    NULL.setParseAction(Null) |
     identifier.setParseAction(Identifier) |
     (EVERY + LPAR + identifier.setParseAction(Identifier) + RPAR).setParseAction(EveryIdentifier) |
     (LPAR + Optional(delimitedList(literal_value.setParseAction(Literal))) + RPAR).setParseAction(ValueList)
@@ -356,14 +416,14 @@ expr << (operatorPrecedence(expr_term,
     [
     (NOT, UNARY, opAssoc.RIGHT, BoolNot),
     (oneOf('< <= > >='), BINARY, opAssoc.LEFT, BinaryComparisonOperator),
-    (oneOf('= == != <>') | IS | IN | LIKE, BINARY, opAssoc.LEFT, BinaryComparisonOperator),
+    (oneOf('= == != <>') | Group(IS + NOT) | IS | IN | LIKE, BINARY, opAssoc.LEFT, BinaryComparisonOperator),
     ((BETWEEN,AND), TERNARY, opAssoc.LEFT, BetweenXAndY),
     (OR, BINARY, opAssoc.LEFT, BoolOr),
     (AND, BINARY, opAssoc.LEFT, BoolAnd),
     (INTERSECTION, BINARY, opAssoc.LEFT, Intersection),
     ])).setParseAction(dont_allow_non_comparing_terms)
 
-ordering_term = identifier + Optional(ASC | DESC)
+ordering_term = (itemName | identifier) + Optional(ASC | DESC)
 
 single_source = table_name("table")
 
@@ -371,14 +431,13 @@ result_column = Group("*" | delimitedList(column_name))("columns")
 select_core = (SELECT + result_column + FROM + single_source + Optional(WHERE + expr("where_expr")))
 
 select_stmt << (select_core +
-                Optional(ORDER + BY + Group(delimitedList(ordering_term))("order_by_terms")) +
-                Optional(LIMIT + integer))
+                Optional(ORDER + BY + Group(delimitedList(ordering_term))).setParseAction(OrderByTerms)("order_by_terms") +
+                Optional(LIMIT + integer)("limit_terms"))
 
 def parse(s):
     try:
         ret = select_stmt.parseString(s, parseAll=True)
         ret.columns = ret.columns.asList()
-#        print ret.dump()
         return ret
     except ParseException:
         raise exceptions.InvalidQueryExpression()
@@ -409,9 +468,8 @@ if __name__ == "__main__":
     select * from xyzzy where z > 100
     select * from xyzzy where z > 100 order by zz
     select * from xyzzy
-    """.splitlines()
-    tests = """\
     SELECT * FROM foobar WHERE colour == 'blue' and size > '5' or shape = 'triangular'
+    select * from xyzzy where z > 100 order by zz
     """.splitlines()
     for t in tests:
         if t.strip() == '':
@@ -419,12 +477,12 @@ if __name__ == "__main__":
         print t
         try:
             tree = parse(t)
-            import pdb;pdb.set_trace()
-            print t.dump()
+            print tree.dump()
         except ParseException, pe:
             print 'Parsing %r failed' % (t,)
             print pe.msg
             print pe.line
             print ' '*(pe.col-1) + '^'
-            raise
+            pass
+#            raise
         print

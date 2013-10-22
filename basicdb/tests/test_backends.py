@@ -1,6 +1,7 @@
 import testtools as unittest
 
 import basicdb.backends
+import basicdb.exceptions as exc
 
 class BaseStorageBackendTests(unittest.TestCase):
     def test_create_domain_raises_not_implemented(self):
@@ -412,7 +413,7 @@ class _GenericBackendDriverTest(object):
                 wrap = list
 
             self.assertEquals(wrap(self.backend.select_wrapper("owner", expr)[0]),
-                              wrap(items))
+                              wrap(items), expr)
 
         f("select * from mydomain where Title = 'The Right Stuff'",
           ["1579124585"])
@@ -461,8 +462,19 @@ class _GenericBackendDriverTest(object):
         f("select * from mydomain where Year < '1980' order by Year asc",
           ["0802131786", "0385333498", "1579124585"], ordered=True)
 
-        f("select * from mydomain where Year < '1980' order by Year desc",
-          ["1579124585", "0385333498", "0802131786"], ordered=True)
+        f("select * from mydomain where Year < '1980' order by Year",
+          ["0802131786", "0385333498", "1579124585"], ordered=True)
+
+        f("select * from mydomain where Year = '2007' intersection Author is not null order by Author desc",
+          ["B00005JPLW", "B000T9886K"], ordered=True)
+
+        self.assertRaises(exc.InvalidSortExpressionException, f, "select * from mydomain order by Year asc", [])
+
+        f("select * from mydomain where Year < '1980' order by Year limit 2",
+          ["0802131786", "0385333498"])
+
+        f("select itemName() from mydomain where itemName() like 'B000%' order by itemName()",
+          ["B00005JPLW", "B000SF3NGK", "B000T9886K"])
 
     def test_select(self):
         self.backend.create_domain("owner", "domain1")

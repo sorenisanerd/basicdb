@@ -2,6 +2,7 @@ import time
 
 import basicdb
 import basicdb.backends
+import basicdb.sqlparser
 
 class FakeBackend(basicdb.backends.StorageBackend):
     _users = {}
@@ -83,9 +84,11 @@ class FakeBackend(basicdb.backends.StorageBackend):
         else:
             result = {}
 
+            return_all = any(isinstance(attr, basicdb.sqlparser.ItemName) for attr in desired_attributes)
+
             for item, item_attrs in matching_items.iteritems():
                 matching_attributes = dict([(attr_name, attr_values) for attr_name, attr_values in item_attrs.iteritems() if attr_name in desired_attributes])
-                if matching_attributes:
+                if return_all or matching_attributes:
                     result[item] = matching_attributes
 
         return result

@@ -8,6 +8,7 @@ import uuid
 
 import basicdb
 import basicdb.backends
+import basicdb.sqlparser
 
 """
 Data model:
@@ -212,10 +213,21 @@ class RiakBackend(basicdb.backends.StorageBackend):
             for expr in exprs:
                 item_filter_js_expr += iterate_over_attrs_js.replace('XXXX', 'if (%s) { matched=true; break; }' % (expr))
 
-        if desired_attributes == ['*']:
+        item_name_included = ''
+        real_desired_attributes = []
+        for col in desired_attributes:
+            if isinstance(col, basicdb.sqlparser.ItemName):
+                item_name_included = 'nonempty = true;'
+            else:
+                real_desired_attributes.append(col)
+
+        if not real_desired_attributes:
+            attr_filter_expr = None
+        elif real_desired_attributes == ['*']:
             attr_filter_expr = 'true'
         else:
-            attr_filter_expr = ' || '.join(["key == '%s'" % col for col in desired_attributes])
+            attr_filter_expr = ' || '.join(["key == '%s'" % col for col in real_desired_attributes])
+
 
         js_func = '''function(riakObject) {
                           var retval = {};
@@ -236,12 +248,13 @@ class RiakBackend(basicdb.backends.StorageBackend):
                                   nonempty = true;
                               }
                           }
+                          %s
                           if (nonempty) {
                               return [[riakObject.key, retval]];
                           } else {
                               return [[]];
                           }
-                      }''' % (cartesianProduct_js, item_filter_js_expr, attr_filter_expr,)
+                      }''' % (cartesianProduct_js, item_filter_js_expr, attr_filter_expr or 'false', item_name_included)
         mapred.map(js_func)
         result = mapred.run()
         if not result:

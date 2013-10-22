@@ -11,3 +11,7 @@ class ConditionalCheckFailed(APIException):
 class InvalidQueryExpression(APIException):
     root_element = "InvalidQueryExpression"
     http_status = '400 Bad Request'
+
+class InvalidSortExpressionException(APIException):
+    root_element = "InvalidSortExpression"
+    http_status = '400 Bad Request'

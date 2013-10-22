@@ -122,13 +122,22 @@ class StorageBackend(object):
 
     def select_wrapper(self, owner, sql_expr):
         parsed = sqlparser.parse(sql_expr)
+        if parsed.where_expr == '':
+            identifiers = []
+        else:
+            identifiers = parsed.where_expr.identifiers()
         raw_results = self.select(owner, parsed)
-        if parsed.order_by_terms:
+        if parsed.order_by_terms.key:
+            if parsed.order_by_terms.key not in identifiers:
+                raise basicdb.exceptions.InvalidSortExpressionException('Blah')
             order = []
             for item_name, item_attrs in raw_results.iteritems():
-                for val in item_attrs[parsed.order_by_terms[0].reference]:
-                    order.append((val, item_name))
-            order.sort(key=lambda x:x[0], reverse=parsed.order_by_terms[1] == "DESC")
+                if parsed.order_by_terms.key == 'itemName()':
+                    order.append((item_name, item_name))
+                else:
+                    for val in item_attrs[parsed.order_by_terms.key]:
+                        order.append((val, item_name))
+            order.sort(key=lambda x:x[0], reverse=parsed.order_by_terms.reverse)
             order = map(lambda x:x[1], order)
             self.prev = None
             def remove_if_same_as_previous(x):
@@ -138,6 +147,8 @@ class StorageBackend(object):
             order = filter(remove_if_same_as_previous, order)
         else:
             order = raw_results.keys()
+        if parsed.limit_terms:
+            order = order[:int(parsed.limit_terms[1])]
         return order, raw_results
 
     def select(self, owner, sql_expr):
