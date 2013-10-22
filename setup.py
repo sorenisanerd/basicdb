@@ -15,12 +15,13 @@
 # limitations under the License.
 
 from setuptools import setup, find_packages
+import pkg_resources
 
 setup(
     name='basicdb',
     version='0.1',
     description='Basic database service',
-    long_description=open('README.rst', 'r').read(),
+    long_description=pkg_resources.resource_string(__name__, "README.rst"),
     author='Soren Hansen',
     author_email='soren@linux2go.dk',
     url='http://github.com/sorenh/basicdb',
