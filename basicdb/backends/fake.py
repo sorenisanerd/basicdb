@@ -84,7 +84,7 @@ class FakeBackend(basicdb.backends.StorageBackend):
         else:
             result = {}
 
-            return_all = any(isinstance(attr, basicdb.sqlparser.ItemName) for attr in desired_attributes)
+            return_all = any(isinstance(attr, (basicdb.sqlparser.ItemName, basicdb.sqlparser.Count)) for attr in desired_attributes)
 
             for item, item_attrs in matching_items.iteritems():
                 matching_attributes = dict([(attr_name, attr_values) for attr_name, attr_values in item_attrs.iteritems() if attr_name in desired_attributes])

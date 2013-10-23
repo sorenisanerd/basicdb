@@ -216,7 +216,7 @@ class RiakBackend(basicdb.backends.StorageBackend):
         item_name_included = ''
         real_desired_attributes = []
         for col in desired_attributes:
-            if isinstance(col, basicdb.sqlparser.ItemName):
+            if isinstance(col, (basicdb.sqlparser.ItemName, basicdb.sqlparser.Count)):
                 item_name_included = 'nonempty = true;'
             else:
                 real_desired_attributes.append(col)

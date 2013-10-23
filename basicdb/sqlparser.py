@@ -161,10 +161,15 @@ class Identifier(BoolOperand):
     def identifiers(self):
         return [self.reference]
 
+
 class ItemName(Identifier):
     def riak_js_expr(self):
         return '[riakObject.key]'
 
+
+class Count(Identifier):
+    def riak_js_expr(self):
+        return '[riakObject.key]'
 
 
 class EveryIdentifier(Identifier):
@@ -383,6 +388,7 @@ keyword = MatchFirst((UNION, ALL, INTERSECT, EXCEPT, COLLATE, ASC, DESC, ON,
  CURRENT_TIMESTAMP))
 
 itemName = MatchFirst(Keyword("itemName()")).setParseAction(ItemName)
+count = MatchFirst(Keyword("count(*)")).setParseAction(Count)
 identifier = ((~keyword + Word(alphas, alphanums+"_")) | QuotedString("`"))
 column_name = (itemName | identifier.copy())
 table_name = identifier.copy()
@@ -427,7 +433,7 @@ ordering_term = (itemName | identifier) + Optional(ASC | DESC)
 
 single_source = table_name("table")
 
-result_column = Group("*" | delimitedList(column_name))("columns")
+result_column = Group("*" | count | delimitedList(column_name))("columns")
 select_core = (SELECT + result_column + FROM + single_source + Optional(WHERE + expr("where_expr")))
 
 select_stmt << (select_core +

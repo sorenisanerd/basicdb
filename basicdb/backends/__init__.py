@@ -149,6 +149,9 @@ class StorageBackend(object):
             order = raw_results.keys()
         if parsed.limit_terms:
             order = order[:int(parsed.limit_terms[1])]
+        if isinstance(parsed.columns[0], basicdb.sqlparser.Count):
+            raw_results = {parsed.table: {"count":set([str(len(order))])}}
+            order = [parsed.table]
         return order, raw_results
 
     def select(self, owner, sql_expr):

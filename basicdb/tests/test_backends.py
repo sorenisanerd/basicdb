@@ -476,6 +476,16 @@ class _GenericBackendDriverTest(object):
         f("select itemName() from mydomain where itemName() like 'B000%' order by itemName()",
           ["B00005JPLW", "B000SF3NGK", "B000T9886K"])
 
+        def g(expr, expected):
+            order, results = self.backend.select_wrapper("owner", expr)
+            self.assertEquals(order, ['mydomain'])
+            self.assertEquals(results['mydomain']['count'].pop(), expected)
+
+        g("select count(*) from mydomain where Title = 'The Right Stuff'", "1")
+        g("select count(*) from mydomain where Year > '1985'", "3")
+        g("select count(*) from mydomain limit 500", "6")
+        g("select count(*) from mydomain limit 4", "4")
+
     def test_select(self):
         self.backend.create_domain("owner", "domain1")
         self.backend.put_attributes("owner", "domain1", "item1",
