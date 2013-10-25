@@ -514,33 +514,52 @@ class _GenericBackendDriverTest(object):
         self.assertEquals(self.backend.select_wrapper("owner", "SELECT shape FROM domain1 WHERE shape = 'triangle'")[1],
                           {"item1": {"shape": set(["square", "triangle"])}})
 
+    def test_unknown_attribute_condition_raises_attribute_does_not_exist(self):
+        self.backend.create_domain("owner", "domain1")
+        self.backend.put_attributes("owner", "domain1",
+                                    "item1",
+                                    {'attr1': set(['attr1val1'])},
+                                    {}, [])
+        self.assertRaises(basicdb.exceptions.AttributeDoesNotExist, self.backend.put_attributes, "owner", "domain1", "item1", {'attr2': set(["attr2val1"])}, {}, [('attr3', 'attr3val1')])
 
-    def test_expectations_met(self):
+    def test_multi_valued_attribute_raises_multi_valued_attribute(self):
         self.backend.create_domain("owner", "domain1")
         self.backend.put_attributes("owner", "domain1", "item1",
-                                    {"shape": set(["square", "triangle"])}, {})
+                                    {'attr1': set(['attr1val1', 'attr1val2'])},
+                                    {}, [])
+        self.assertRaises(basicdb.exceptions.MultiValuedAttribute, self.backend.put_attributes, "owner", "domain1", "item1", {'attr2': set(["attr2val1"])}, {}, [('attr1', 'attr1val1')])
 
-        self.assertFalse(self.backend.check_expectations("owner", "domain1", "item1", [("shape", False)]))
-        self.assertFalse(self.backend.check_expectations("owner", "domain1", "item1", [("colour", True)]))
-        self.assertTrue(self.backend.check_expectations("owner", "domain1", "item1", [("colour", False)]))
-        self.assertTrue(self.backend.check_expectations("owner", "domain1", "item1", [("shape", True)]))
-        self.assertTrue(self.backend.check_expectations("owner", "domain1", "item1", [("shape", "square")]))
-
-        self.assertFalse(self.backend.check_expectations("owner", "domain1", "item1",
-                                                         [("shape", False),
-                                                          ("colour", False),
-                                                          ("shape", True),
-                                                          ("shape", "square")]))
-
-        self.assertTrue(self.backend.check_expectations("owner", "domain1", "item1",
-                                                        [("colour", False),
-                                                         ("shape", True),
-                                                         ("shape", "square")]))
-
-    def test_check_condition_fails_for_unknown_domain_and_item(self):
-        self.assertFalse(self.backend.check_expectations("owner", "domain1", "item1", [("foo", "bar")]))
+    def test_wrong_value_raises_conditional_check_failed(self):
         self.backend.create_domain("owner", "domain1")
-        self.assertFalse(self.backend.check_expectations("owner", "domain1", "item1", [("foo", "bar")]))
+        self.backend.put_attributes("owner", "domain1", "item1",
+                                    {'attr1': set(['attr1val1'])},
+                                    {}, [])
+        self.assertRaises(basicdb.exceptions.WrongValueFound, self.backend.put_attributes, "owner", "domain1", "item1", {'attr2': set(["attr2val1"])}, {}, [('attr1', 'attr1val2')])
+
+    def test_unexpected_attribute_raises_unexpected_value(self):
+        self.backend.create_domain("owner", "domain1")
+        self.backend.put_attributes("owner", "domain1", "item1",
+                                    {'attr1': set(['attr1val1'])},
+                                    {}, [])
+        self.assertRaises(basicdb.exceptions.FoundUnexpectedAttribute, self.backend.put_attributes, "owner", "domain1", "item1", {'attr2': set(["attr2val1"])}, {}, [('attr1', False)])
+
+    def test_expected_attribute_value_succeeds(self):
+        self.backend.create_domain("owner", "domain1")
+        self.backend.put_attributes("owner", "domain1", "item1",
+                                    {'attr1': set(['attr1val1'])},
+                                    {}, [])
+        self.backend.put_attributes("owner", "domain1", "item1",
+                                    {'attr2': set(["attr2val1"])}, {},
+                                    [('attr1', 'attr1val1')])
+
+    def test_expected_attribute_succeeds(self):
+        self.backend.create_domain("owner", "domain1")
+        self.backend.put_attributes("owner", "domain1", "item1",
+                                    {'attr1': set(['attr1val1'])},
+                                    {}, [])
+        self.backend.put_attributes("owner", "domain1", "item1",
+                                    {'attr2': set(["attr2val1"])}, {},
+                                    [('attr1', True)])
 
 
 class FakeBackendDriverTest(_GenericBackendDriverTest, unittest.TestCase):

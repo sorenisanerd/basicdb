@@ -162,6 +162,32 @@ class StorageBackend(object):
 
     def check_expectations(self, owner, domain_name, item_name, expectations):
         return all([self.check_expectation(owner, domain_name, item_name, expectation) for expectation in expectations])
-        
-    def check_expectation(self, owner, domain_name, item_name, expectations):
-        raise NotImplementedError()
+
+    def check_expectation(self, owner, domain_name, item_name, expectation):
+        attr_name, attr_value_expected = expectation
+
+        attrs = self.get_attributes(owner, domain_name, item_name)
+
+        if attr_name in attrs:
+            if attr_value_expected == False:
+                raise basicdb.exceptions.FoundUnexpectedAttribute(attr_name)
+            attr = attrs[attr_name]
+
+            if len(attr) > 1:
+                raise basicdb.exceptions.MultiValuedAttribute(attr_name)
+
+            if attr_value_expected == True:
+                return True
+
+            attr_value = attr.copy().pop()
+
+            if attr_value == attr_value_expected:
+                return True
+            else:
+                raise basicdb.exceptions.WrongValueFound(attr_name,
+                                                         attr_value_expected,
+                                                         attr_value)
+        else:
+            if attr_value_expected == False:
+                return True
+            raise basicdb.exceptions.AttributeDoesNotExist(attr_name)

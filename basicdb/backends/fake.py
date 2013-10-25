@@ -109,18 +109,9 @@ class FakeBackend(basicdb.backends.StorageBackend):
             item_name not in self._users[owner][domain_name]):
             return False
 
-        attr_name, attr_value_expected = expectation
-
-        attr_value = self._users[owner][domain_name][item_name].get(attr_name, False)
-
-        if attr_value == False:
-            if attr_value_expected == False:
-                return True
-            return False
-        elif attr_value_expected == True:
-            return True
-        else:
-            return attr_value_expected in attr_value
-         
+        return super(FakeBackend, self).check_expectation(owner,
+                                                          domain_name,
+                                                          item_name,
+                                                          expectation)
 
 driver = FakeBackend()

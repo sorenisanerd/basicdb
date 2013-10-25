@@ -277,20 +277,4 @@ class RiakBackend(basicdb.backends.StorageBackend):
                 "AttributeValuesSizeBytes": '100020',
                 "Timestamp": str(int(time.time()))}
 
-    def check_expectation(self, owner, domain_name, item_name, expectation):
-        attr_name, attr_value_expected = expectation
-
-        attrs = self.get_attributes(owner, domain_name, item_name)
-
-        attr_value = attrs.get(attr_name, False)
-
-        if attr_value == False:
-            if attr_value_expected == False:
-                return True
-            return False
-        elif attr_value_expected == True:
-            return True
-        else:
-            return attr_value_expected in attr_value
-
 driver = RiakBackend()
