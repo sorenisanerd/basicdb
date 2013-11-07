@@ -584,6 +584,10 @@ class FilesystemBackendDriverTest(_GenericBackendDriverTest, unittest.TestCase):
 
 class RiakBackendDriverTest(_GenericBackendDriverTest, unittest.TestCase):
     def setUp(self):
+        import os
+        if 'ENABLE_RIAK_TESTS' not in os.environ:
+            self.skip("Riak tests not enabled (set ENABLE_RIAK_TESTS "
+                      "env to enable)")
         super(RiakBackendDriverTest, self).setUp()
         import basicdb.backends.riak
         import uuid
