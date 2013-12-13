@@ -565,8 +565,7 @@ class _GenericBackendDriverTest(object):
 class FakeBackendDriverTest(_GenericBackendDriverTest, unittest.TestCase):
     def setUp(self):
         super(FakeBackendDriverTest, self).setUp()
-        import basicdb.backends.fake
-        self.backend = basicdb.backends.fake.driver
+        self.backend = basicdb.backends.fake.driver()
 
     def tearDown(self):
         super(FakeBackendDriverTest, self).tearDown()
@@ -576,7 +575,7 @@ class FilesystemBackendDriverTest(_GenericBackendDriverTest, unittest.TestCase):
     def setUp(self):
         super(FilesystemBackendDriverTest, self).setUp()
         import basicdb.backends.filesystem
-        self.backend = basicdb.backends.filesystem.driver
+        self.backend = basicdb.backends.filesystem.driver()
 
     def tearDown(self):
         super(FilesystemBackendDriverTest, self).tearDown()
@@ -591,7 +590,7 @@ class RiakBackendDriverTest(_GenericBackendDriverTest, unittest.TestCase):
         super(RiakBackendDriverTest, self).setUp()
         import basicdb.backends.riak
         import uuid
-        self.backend = basicdb.backends.riak.RiakBackend(base_bucket='testbucket%s' % (uuid.uuid4().hex,))
+        self.backend = basicdb.backends.riak.driver(base_bucket='testbucket%s' % (uuid.uuid4().hex,))
 
     def tearDown(self):
         super(RiakBackendDriverTest, self).tearDown()

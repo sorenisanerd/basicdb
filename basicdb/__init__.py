@@ -14,7 +14,7 @@ backend = None
 
 def load_backend(name):
     global backend
-    backend = importlib.import_module('basicdb.backends.%s' % (name,)).driver
+    backend = importlib.import_module('basicdb.backends.%s' % (name,)).driver()
 
 load_backend(os.environ.get('BASICDB_BACKEND_DRIVER', 'fake'))
 

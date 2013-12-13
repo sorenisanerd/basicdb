@@ -155,4 +155,4 @@ class FileSystemBackend(basicdb.backends.StorageBackend):
                 "AttributeValuesSizeBytes": '100020',
                 "Timestamp": str(int(time.time()))}
 
-driver = FileSystemBackend()
+driver = FileSystemBackend

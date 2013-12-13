@@ -277,4 +277,4 @@ class RiakBackend(basicdb.backends.StorageBackend):
                 "AttributeValuesSizeBytes": '100020',
                 "Timestamp": str(int(time.time()))}
 
-driver = RiakBackend()
+driver = RiakBackend

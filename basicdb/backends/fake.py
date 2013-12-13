@@ -5,7 +5,8 @@ import basicdb.backends
 import basicdb.sqlparser
 
 class FakeBackend(basicdb.backends.StorageBackend):
-    _users = {}
+    def __init__(self):
+        self._reset()
 
     def _reset(self):
         self._users = {}
@@ -114,4 +115,4 @@ class FakeBackend(basicdb.backends.StorageBackend):
                                                           item_name,
                                                           expectation)
 
-driver = FakeBackend()
+driver = FakeBackend

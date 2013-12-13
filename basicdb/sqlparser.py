@@ -86,7 +86,6 @@ class BoolOperand(object):
 
 class OrderByTerms(object):
     def __init__(self, t):
-        # t[:2] = ['ORDER', 'BY']
         t = t[:]
         if len(t) <= 2:
             self.key = None
