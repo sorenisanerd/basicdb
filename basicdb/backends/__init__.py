@@ -121,7 +121,7 @@ class StorageBackend(object):
         raise NotImplementedError()
 
     def select_wrapper(self, owner, sql_expr):
-        parsed = sqlparser.parse(sql_expr)
+        parsed = sqlparser.SqlParser().parse(sql_expr)
         if parsed.where_expr == '':
             identifiers = []
         else:
@@ -149,7 +149,7 @@ class StorageBackend(object):
             order = raw_results.keys()
         if parsed.limit_terms:
             order = order[:int(parsed.limit_terms[1])]
-        if isinstance(parsed.columns[0], basicdb.sqlparser.Count):
+        if isinstance(parsed.columns[0], basicdb.sqlparser.SqlParser.Count):
             raw_results = {parsed.table: {"count":set([str(len(order))])}}
             order = [parsed.table]
         return order, raw_results

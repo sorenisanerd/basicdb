@@ -95,7 +95,6 @@ iterate_over_attrs_js = '''
     }
 '''
  
-
 class RiakBackend(basicdb.backends.StorageBackend):
     def __init__(self, base_bucket='basicdb'):
         self.riak = riak.RiakClient(pb_port=8087, protocol='pbc')
@@ -216,7 +215,7 @@ class RiakBackend(basicdb.backends.StorageBackend):
         item_name_included = ''
         real_desired_attributes = []
         for col in desired_attributes:
-            if isinstance(col, (basicdb.sqlparser.ItemName, basicdb.sqlparser.Count)):
+            if isinstance(col, (basicdb.sqlparser.SqlParser.ItemName, basicdb.sqlparser.SqlParser.Count)):
                 item_name_included = 'nonempty = true;'
             else:
                 real_desired_attributes.append(col)
